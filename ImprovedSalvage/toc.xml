@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="Carbine" APIVersion="8" Name="ImprovedSalvage" Description="Extraction of salvage form from the inventory base addon">
-
-    <Script Name="ImprovedSalvage.lua"/>
-    <Form Name="ImprovedSalvage.xml"/>
-</Addon>

@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Addon Author="Leosky" APIVersion="8" Name="SpaceStashInventory" Description="">
-
-	<!-- libs -->
-	<Script Name="lib/inspect.lua"/>
+    <!-- libs -->
+    <Script Name="lib/inspect.lua"/>
     <Script Name="lib/GeminiLogging/GeminiLogging.lua"/>
-
+    
     <Script Name="SpaceStashInventory.lua"/>
+    <Script Name="ImprovedSalvage.lua" />
+    <Script Name="ItemPreview.lua" />
     <Form Name="SpaceStashInventory.xml"/>
-
-    <!--ReplaceAddon Name="Inventory"/-->
+    <Form Name="ImprovedSalvage.xml" />
+    <Form Name="ItemPreview.xml" />
+    <ReplaceAddon Name="Inventory"/>
 </Addon>
