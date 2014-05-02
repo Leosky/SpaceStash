@@ -18,11 +18,8 @@ local SpaceStashInventory = {}
 -----------------------------------------------------------------------------------------------
 -- Libraries
 -----------------------------------------------------------------------------------------------
-local GeminiLogging
-local GeminiConsole
+local GeminiLogging	
 local inspect
-local ImprovedSalvage
-local Keybind
 
 -----------------------------------------------------------------------------------------------
 -- Constants
@@ -36,7 +33,6 @@ tCurrencies["ElderGems"] = Money.CodeEnumCurrencyType.ElderGems
 tCurrencies["Prestige"] = Money.CodeEnumCurrencyType.Prestige
 tCurrencies["Renown"] = Money.CodeEnumCurrencyType.Renown
 tCurrencies["CraftingVouchers"] = Money.CodeEnumCurrencyType.CraftingVouchers
-
 
 function SpaceStashInventory:OnLoad()
 	inspect = Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
@@ -52,7 +48,7 @@ function SpaceStashInventory:OnLoad()
 	self.tConfig.version = {}
 	self.tConfig.version.MAJOR = MAJOR
 	self.tConfig.version.MINOR = MINOR
-	self.tConfig.window = { IconSize = 48, RowSize = 10}
+	self.tConfig.window = { IconSize = 36, RowSize = 10}
 	self.tConfig.window.location = { fPoints = {0,0,0,0}, nOffsets = {64,64,576,756}}
 	self.tConfig.currencies = {eCurrencyType = Money.CodeEnumCurrencyType.Renown}
 
@@ -104,7 +100,7 @@ end
 -----------------------------------------------------------------------------------------------
 function SpaceStashInventory:OnSystemBeginDragDrop(wndSource, strType, iData)
 	if strType ~= "DDBagItem" then return end
-	Print(inspect.inspect(iData))
+
 	Sound.Play(Sound.PlayUI45LiftVirtual)
 end
 
