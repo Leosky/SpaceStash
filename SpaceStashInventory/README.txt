@@ -1,12 +1,10 @@
------------------------------------------------------------------------------------------------
--- Overview
------------------------------------------------------------------------------------------------
+Overview
+========
 This addon aim to be an Wildstar equivalent of Bagnon. You can configure this size and basic appearance to have a light replacement of the huge Inventory stock addon.
 Currently the addon don't remove the stock Inventory addon to let you access virtual inventory and crafting inventory until this feature is added to SpaceStashInventory. For quick access, you can create a macro to bind the addon to a key on your bar with "/ssi" command.
 
------------------------------------------------------------------------------------------------
--- Commands
------------------------------------------------------------------------------------------------
+Commands
+========
 /ssi : This command toggle the visibility state of the SpaceStashInventory
 /ssi help : Show this help
 /ssi option RowSize [number] : define the number of item per row you want.
@@ -15,9 +13,8 @@ Currently the addon don't remove the stock Inventory addon to let you access vir
 /ssi redraw : debuging purpose - redraw the bag window
 /ssi info : debuging purpose - send the metatable to GeminiConsole
 
------------------------------------------------------------------------------------------------
--- Missing features before 1.0
------------------------------------------------------------------------------------------------
+Missing features before 1.0
+===========================
 The addon is in an early stage so some features are missing. Here is a non-exhaustive list :
 
 1	Config : A window to configure the addon without commands
@@ -27,9 +24,8 @@ The addon is in an early stage so some features are missing. Here is a non-exhau
 5.	Search box : highlight item in your inventory based on search patterns
 6.	Salvaging : Chose between the current ImprovedSalvage or a toggle button highlight salvageable items and to salvage clicked items. 
 
------------------------------------------------------------------------------------------------
--- Possible features
------------------------------------------------------------------------------------------------
+Possible features
+=================
 This features mostly depend of evolution of addon Libraries like Gemini.
 
 *	Ability to other modder to define the salvaging and previewing method
@@ -37,17 +33,16 @@ This features mostly depend of evolution of addon Libraries like Gemini.
 *	Alt bag access to view items in your alt inventory / bank
 *	A customizable data display of other addon
 
------------------------------------------------------------------------------------------------
--- Known bugs
------------------------------------------------------------------------------------------------
+Known bugs
+==========
 *	Inventory dont resize with bag changes.
 *	The new item sprit dont fade until the item is moved.
 *	Impossible to destroy items.
 
------------------------------------------------------------------------------------------------
--- Changelog
------------------------------------------------------------------------------------------------
--- beta2 --
+Changelog
+=========
+beta2
+-----
 *	Added an icon for item that cannot be used.
 *	Removed GeminiConsole dependancy
 *	Added a command /ssi redraw for debuging purpose.
@@ -55,5 +50,6 @@ This features mostly depend of evolution of addon Libraries like Gemini.
 *	Fixed command /ssi option currency.
 *	Command /ssi option BoxPerRow and SquarePerRow have been renamed RowSize and IconSize.
 
--- beta1 --
+beta1
+-----
 *	Initial release
