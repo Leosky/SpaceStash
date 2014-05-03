@@ -185,7 +185,7 @@ end
 -----------------------------------------------------------------------------------------------
 function SpaceStashInventory:OnSave(eLevel)
 
-	if eLevel ~= 1 then 
+	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Account then 
 		return 
 	end
 
@@ -193,7 +193,7 @@ function SpaceStashInventory:OnSave(eLevel)
 end
 
 function SpaceStashInventory:OnRestore(eLevel, tData )
-	if eLevel ~= 1 then 
+	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Account then 
 		return
 	end
 	
