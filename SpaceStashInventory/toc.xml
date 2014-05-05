@@ -3,12 +3,11 @@
     <!-- libs -->
     <Script Name="lib/inspect.lua"/>
     <Script Name="lib/GeminiLogging/GeminiLogging.lua"/>
-    
     <Script Name="SpaceStashInventory.lua"/>
-    <Script Name="ImprovedSalvage.lua" />
-    <Script Name="ItemPreview.lua" />
+    <Script Name="ImprovedSalvage.lua"/>
+    <Script Name="ItemPreview.lua"/>
     <Form Name="SpaceStashInventory.xml"/>
-    <Form Name="ImprovedSalvage.xml" />
-    <Form Name="ItemPreview.xml" />
+    <Form Name="ImprovedSalvage.xml"/>
+    <Form Name="ItemPreview.xml"/>
     <ReplaceAddon Name="Inventory"/>
 </Addon>
