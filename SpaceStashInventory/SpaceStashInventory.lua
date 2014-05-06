@@ -53,7 +53,7 @@ tDefaults.location.y = 64
 tDefaults.currencies = {eCurrencyType = Money.CodeEnumCurrencyType.Renown}
 tDefaults.SelectedTab = codeEnumTabDisplay.BagsTab
 tDefaults.auto.Repair = true
-tDefaults.auto.SellJunk = true
+tDefaults.auto.SellJunks = true
 
 -----------------------------------------------------------------------------------------------
 -- Base Wildstar addon behaviours
@@ -142,8 +142,18 @@ function SpaceStashInventory:OnDocLoaded()
 				self.wndCash = self.wndCurrencies:FindChild("CashWindow")
 		
 		self.wndPlayerMenuFrame = self.wndMain:FindChild("PlayerMenuFrame")
-		self.boxIconSize = self.wndPlayerMenuFrame :FindChild("IconSizeBox")
-		self.boxRowSize = self.wndPlayerMenuFrame :FindChild("RowSizeBox")
+			self.radioElderGems = self.wndPlayerMenuFrame("ElderGemsRadio")
+			self.radioPrestige = self.wndPlayerMenuFrame("PrestigeRadio")
+			self.radioRenown = self.wndPlayerMenuFrame("RenownRadio")
+			self.radioCraftingVoucher = self.wndPlayerMenuFrame("CraftingVouchersRadio")
+
+			self.sliderIconSize = self.wndPlayerMenuFrame:FindChild("IconSizeSlider")
+				self.wndIconSize= self.wndPlayerMenuFrame:FindChild("IconSizeWindow")
+			self.sliderRowSize = self.wndPlayerMenuFrame:FindChild("RowSizeSlider")
+				self.wndRowSize = self.wndPlayerMenuFrame:FindChild("RowSizeWindow")
+
+			self.checkerAutoSellJunks = self.wndPlayerMenuFrame:FindChild("AutoSellJunksChecker")
+			self.checkerAutoRepair = self.selfwndPlaye:FindChild("AutoRepariChecker")
 		
 		self.xmlDoc = nil
 		
@@ -155,7 +165,6 @@ function SpaceStashInventory:OnDocLoaded()
 		  pattern = "%d [%c:%n] %l - %m",
 		  appender = "GeminiConsole"
 		})
-
 
 		if self.tConfig.SelectedTab == codeEnumTabDisplay.BagsTab then
 			self.wndTopFrame:FindChild("ShowBagsTabButton"):SetCheck(true)
@@ -187,21 +196,10 @@ function SpaceStashInventory:OnDocLoaded()
 			self.wndTradeskillsBagTabFrame:Show(false)
 		end
 
-		if self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.ElderGems then
-			self.wndPlayerMenuFrame:FindChild("ElderGemsRadio"):SetCheck(true)
-		elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Prestige then
-			self.wndPlayerMenuFrame:FindChild("PrestigeRadio"):SetCheck(true)
-		elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Renown then
-			self.wndPlayerMenuFrame:FindChild("RenownRadio"):SetCheck(true)
-		elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.CraftingVouchers then
-			self.wndPlayerMenuFrame:FindChild("CraftingVouchersRadio"):SetCheck(true)
-		end
-		
-		self.boxIconSize:SetText(tostring(self.tConfig.IconSize))
-		self.boxRowSize:SetText(tostring(self.tConfig.RowSize))
+		self:OnPlayerButtonUncheck()
 		
 		self:Redraw()
-
+		
 		Apollo.RegisterEventHandler("InvokeVendorWindow",	"OnVendorInterfaceOpened", self)
 
 		Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
@@ -364,6 +362,22 @@ function SpaceStashInventory.GetItemByFilterFunction(funcFilter)
 	end
 end
 
+function SpaceStashInventory:OnAutoRepairChecked()
+		self.tConfig.auto.Repair = true	
+end
+
+function SpaceStashInventory:OnAutoRepairUnchecked()
+		self.tConfig.auto.Repair = false
+end
+
+function SpaceStashInventory:onAutoSellJunksChecked()
+	self.tConfig.auto.SellJunks = true		
+end	
+
+function SpaceStashInventory:onAutoSellJunksUnhecked()
+	self.tConfig.auto.SellJunks = false
+end
+
 -----------------------------------------------------------------------------------------------
 -- Currencies Functions
 -----------------------------------------------------------------------------------------------
@@ -387,6 +401,8 @@ end
 
 function SpaceStashInventory:ResetConfig() 
 	self.tConfig = tDefaults
+	
+	self:OnPlayerButtonUncheck() --to be sure that the option window is corresponding
 end
 ---------------------------------------------------------------------------------------------------
 -- SpaceStashInventory Commands 
@@ -430,30 +446,40 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 				self.tConfig.currencies.eCurrencyType = eType
 				self.wndCurrency:SetMoneySystem(eType)
 				self:UpdateCashAmount()
+				self:OnPlayerButtonUncheck()
 			else
 				ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Command, args[3] .. " is not a valid currency[ElderGems,Prestige,Renown,CraftingVouchers]")
 			end
 		elseif string.lower(args[2]) == "rowsize" then
 			local size = string.match(args[3],"%d+")
 			if size ~= nil then
+
 				self:RowSizeChange(size)
+				self:OnInventoryDisplayChange()
+				self:OnPlayerButtonUncheck()
 			end
 		elseif string.lower(args[2]) == "iconsize" then
 			local size = string.match(args[3],"%d+")
 			if size ~= nil then
 				self:IconSizeChange(size)
+				self:OnInventoryDisplayChange()
+				self:OnPlayerButtonUncheck()
 			end
 		elseif string.lower(args[2]) == "autoselljunks" then
 			if args[3] == string.lower("true") then
 				self.tConfig.auto.SellJunks = true
-			else
+				self:OnPlayerButtonUncheck()
+			elseif args[3] == string.lower("false") then
 				self.tConfig.auto.SellJunks = false
+				self:OnPlayerButtonUncheck()
 			end
 		elseif string.lower(args[2]) == "autorepair" then
 			if args[3] == string.lower("true") then
 				self.tConfig.auto.Repair = true
-			else
+				self:OnPlayerButtonUncheck()
+			elseif args[3] == string.lower("false") then
 				self.tConfig.auto.Repair = false
+				self:OnPlayerButtonUncheck()
 			end
 		end
 	end
@@ -667,29 +693,43 @@ end
 
 function SpaceStashInventory:OnPlayerButtonUncheck( wndHandler, wndControl, eMouseButton )
 	self.wndPlayerMenuFrame:Show(false,true)
-	self.boxIconSize:SetText(self.tConfig.IconSize)
-	self.boxRowSize:SetText(self.tConfig.RowSize)
+
+	self.radioElderGems:SetCheck(self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.ElderGems)
+	self.radioPrestige:SetCheck(self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Prestige)
+	self.radioRenown:SetCheck(self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Renown)
+	self.radioCraftingVoucher:SetCheck(self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.CraftingVouchers)
+
+	self.checkerAutoSellJunks:SetCheck(self.tConfig.auto.SellJunks)
+	self.checkerAutoRepair:SetCheck(self.tConfig.auto.Repair)
+	self.sliderIconSize:setValue(self.tConfig.IconSize)
+	self.sliderRowSize:setValue(self.tConfig.RowSize)
+	self.wndIconSize:SetText(tostring(self.tConfig.IconSize))
+	self.wndRowSize:SetText(tostring(self.tConfig.RowSize))
 end
 
-function SpaceStashInventory:OnIconSizeChange( wndHandler, wndControl, strText )
-	self:IconSizeChange(strText)
+function SpaceStashInventory:OnIconSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
+	self:IconSizeChange(fNewValue)
+	self.wndIconSize:SetText(tostring(fNewValue))
 	self:OnInventoryDisplayChange()
 end
 
-function SpaceStashInventory:OnRowSizeChange( wndHandler, wndControl, strText )
+function SpaceStashInventory:OnRowSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
 	self:RowSizeChange(strText)
+	self.wndRowSize:SetText(tostring(fNewValue))
 	self:OnInventoryDisplayChange()
 end
 
 function SpaceStashInventory:OnOptionAccept( wndHandler, wndControl, eMouseButton )
 
-	self:IconSizeChange(tonumber(self.boxIconSize:GetText()))
-	self:RowSizeChange(tonumber(self.boxRowSize:GetText()))
+	self:IconSizeChange(tonumber(self.wndIconSize:GetText()))
+	self:RowSizeChange(tonumber(self.wndRowSize:GetText()))
 	
 	self.wndPlayerMenuFrame:Show(false,true)
 	self:OnInventoryDisplayChange()
 end
 --
+
+
 
 -----------------------------------------------------------------------------------------------
 -- SpaceStashInventory Instance
