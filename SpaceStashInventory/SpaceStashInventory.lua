@@ -21,17 +21,18 @@ local GeminiLogging
 local inspect
 
 -----------------------------------------------------------------------------------------------
--- Constants
+-- Constants and Defaults parameters
 -----------------------------------------------------------------------------------------------
 local MAJOR, MINOR = "SpaceStashInventory-Beta", 5
 
 local kcrSelectedText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloNormal")
-local tCurrencies = {}
-tCurrencies["ElderGems"] = Money.CodeEnumCurrencyType.ElderGems
-tCurrencies["Prestige"] = Money.CodeEnumCurrencyType.Prestige
-tCurrencies["Renown"] = Money.CodeEnumCurrencyType.Renown
-tCurrencies["CraftingVouchers"] = Money.CodeEnumCurrencyType.CraftingVouchers
+local tCurrencies = {
+	ElderGems = Money.CodeEnumCurrencyType.ElderGems,
+	Prestige = Money.CodeEnumCurrencyType.Prestige,
+	Renown = Money.CodeEnumCurrencyType.Renown,
+	CraftingVouchers = Money.CodeEnumCurrencyType.CraftingVouchers
+}
 
 local codeEnumTabDisplay = {
 	None = 0,
@@ -51,17 +52,63 @@ tDefaults.location.x = 64
 tDefaults.location.y = 64
 tDefaults.currencies = {eCurrencyType = Money.CodeEnumCurrencyType.Renown}
 tDefaults.SelectedTab = codeEnumTabDisplay.BagsTab
+tDefaults.auto.Repair = true
+tDefaults.auto.SellJunk = true
+
+-----------------------------------------------------------------------------------------------
+-- Base Wildstar addon behaviours
+-----------------------------------------------------------------------------------------------
+
+function SpaceStashInventory:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self 
+    return o
+end
 
 function SpaceStashInventory:OnLoad()
 	inspect = Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
 	GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
-	self.tConfig = tDefaults
+	self.tConfig = tDefaults -- tCOnfig is set here to avoid late loading
 	
-    -- load our form file
+    -- load the base form
 	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashInventory.xml")
 	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
 end
 
+
+
+
+function SpaceStashInventory:OnSave(eLevel)
+
+	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then 
+		return 
+	end
+
+	return self.tConfig
+end
+
+function SpaceStashInventory:OnRestore(eLevel, tData )
+	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then 
+		return
+	end
+
+	if tData == nil then
+		self:ResetConfig()
+	else
+		if tData.version.MINOR ~= 5 then
+			self:ResetConfig()
+			self.tConfig.version.MINOR = 5
+		else
+			self.tConfig = tData
+		end
+	end
+
+end
+
+-----------------------------------------------------------------------------------------------
+-- Async loading handling
+-----------------------------------------------------------------------------------------------
 function SpaceStashInventory:OnDocLoaded()
 	if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
 		
@@ -104,7 +151,7 @@ function SpaceStashInventory:OnDocLoaded()
 		_, self.display.height, _, _, self.display.width = Apollo.GetDisplaySize()
 
 		self.glog = GeminiLogging:GetLogger({
-		  level = GeminiLogging.DEBUG,
+		  level = GeminiLogging.INFO,
 		  pattern = "%d [%c:%n] %l - %m",
 		  appender = "GeminiConsole"
 		})
@@ -155,6 +202,8 @@ function SpaceStashInventory:OnDocLoaded()
 		
 		self:Redraw()
 
+		Apollo.RegisterEventHandler("InvokeVendorWindow",	"OnVendorInterfaceOpened", self)
+
 		Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
 		Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
 		Apollo.RegisterEventHandler("WindowMove", "OnWindowMove", self)
@@ -176,6 +225,7 @@ function SpaceStashInventory:OnDocLoaded()
 end
 
 function SpaceStashInventory:OnInterfaceMenuListHasLoaded()
+	self.glog:debug("SpaceStashInventory added to the Menu.")
 	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", Apollo.GetString("InterfaceMenu_Inventory"), {"InterfaceMenu_ToggleInventory", "Inventory", ""})
 end
 
@@ -265,33 +315,53 @@ function SpaceStashInventory:OnSplitStackConfirm(wndHandler, wndCtrl)
 end
 
 -----------------------------------------------------------------------------------------------
--- SpaceStashInventory Persistance
+-- @Automation
 -----------------------------------------------------------------------------------------------
-function SpaceStashInventory:OnSave(eLevel)
 
-	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then 
-		return 
+function SpaceStashInventory:OnVendorInterfaceOpened()
+	if self.tConfig.auto.SellJunks then
+		self:SellJunks()
 	end
 
-	return self.tConfig
+	if self.tConfig.auto.Repair then
+		RepairAllItemsVendor()
+	end
 end
 
-function SpaceStashInventory:OnRestore(eLevel, tData )
-	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then 
-		return
+--@return nSoldValue the total value of item sold.
+--should i have to add a whitelite to ignore items that have been buyback ?
+function SpaceStashInventory:SellJunks()
+	local arJunks = self.GetItemByQuality(Item.codeEnumQuality.Inferior)
+	local nSoldValue = 0
+	for _, item in ipairs(arJunks) do
+		if not item:IsSalvagable() and item:IsSellable() and item:GetSellPrice() > 0 then	--check behavior for 'refunding' token items
+			SellItemToVendorById(item:GetInventoryId(), item:GetStackCount())
+		end
 	end
+end
 
-	if tData == nil then
-		self:ResetConfig()
-	else
-		if tData.version.MINOR ~= 5 then
-			self:ResetConfig()
-			self.tConfig.version.MINOR = 5
-		else
-			self.tConfig = tData
+function SpaceStashInventory.GetItemByQuality(codeEnumQuality)
+	local codeEnumItemQuality = Item.codeEnumItemQuality --not loaded in general because should not loaded often.
+	local arItems = {}
+	for _, item in ipairs(GameLib.GetPlayerUnit():GetInventoryItems()) do 
+		if item:GetQuality() > codeEnumItemQuality.Inferior then
+			table.insert(arItems, item)
 		end
 	end
 
+	return arItems
+end
+
+-- return an array containing all item where funcFilter(item) returned true
+function SpaceStashInventory.GetItemByFilterFunction(funcFilter)
+	if type(funcFilter) ~= "function" then return end
+	local arItems = {}
+
+	for _, item in ipairs(GameLib.GetPlayerUnit():GetInventoryItems()) do  ---check key type, to see if it can be usefull to pass it to the function too.
+		if funcFilter(item) then
+			table.insert(arItems, item)
+		end
+	end
 end
 
 -----------------------------------------------------------------------------------------------
@@ -331,15 +401,18 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 		self:Redraw()
 	elseif strParam == "help" then 
 		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Command, 
-				[[/ssi : This command toggle the visibility state of the SpaceStashInventory\n
+				[[
+				/ssi : This command toggle the visibility state of the SpaceStashInventory\n
 				/ssi help : Show this help\n
 				/ssi option RowSize [number] : define the number of item per row you want.\n
 				/ssi option IconSize [number] : define size of item icons.\n
 				/ssi option currency [ElderGems,Prestige,Renown,CraftingVouchers] : define the currently tracked alternative currency.\n
 				/ssi redraw : debuging purpose - redraw the bag window\n
-				/ssi info : debuging purpose - send the metatable to GeminiConsole]]
+				/ssi info : debuging purpose - send the metatable to GeminiConsole
+				/ssi option AutoSellJunks [true or false]
+				/ssi option AutoRepair [true or false]
+				]]
 			)
-
 	elseif strParam == "info" then 
 		self.glog:info(self)
 	elseif strParam == "redraw" then
@@ -369,6 +442,18 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 			local size = string.match(args[3],"%d+")
 			if size ~= nil then
 				self:IconSizeChange(size)
+			end
+		elseif string.lower(args[2]) == "autoselljunks" then
+			if args[3] == string.lower("true") then
+				self.tConfig.auto.SellJunks = true
+			else
+				self.tConfig.auto.SellJunks = false
+			end
+		elseif string.lower(args[2]) == "autorepair" then
+			if args[3] == string.lower("true") then
+				self.tConfig.auto.Repair = true
+			else
+				self.tConfig.auto.Repair = false
 			end
 		end
 	end
@@ -487,7 +572,6 @@ function SpaceStashInventory:OnGenerateBagTooltip(wndControl, wndHandler, tType,
 	wndControl:SetTooltipDoc(nil)
 	if item ~= nil then
 		Tooltip.GetItemTooltipForm(self, wndControl, item, {bPrimary = true, bSelling = false})
-
 	else
 		wndControl:SetTooltip(wndControl:GetName() and ("<P Font=\"CRB_InterfaceSmall_O\">No bag equipped.</P>") or "")
 	end
@@ -537,8 +621,6 @@ function SpaceStashInventory:OnShowTradeskillsBagTab(wndHandler, wndControl, eMo
 		self.wndTradeskillsBagTabFrame:Show(true)
 		self:Redraw()
 	end 
-
-	
 end
 
 function SpaceStashInventory:OnTabUnshow(wndHandler, wndControl, eMouseButton )
@@ -607,16 +689,11 @@ function SpaceStashInventory:OnOptionAccept( wndHandler, wndControl, eMouseButto
 	self.wndPlayerMenuFrame:Show(false,true)
 	self:OnInventoryDisplayChange()
 end
+--
 
 -----------------------------------------------------------------------------------------------
 -- SpaceStashInventory Instance
 -----------------------------------------------------------------------------------------------
-function SpaceStashInventory:new(o)
-    o = o or {}
-    setmetatable(o, self)
-    self.__index = self 
-    return o
-end
 
 Apollo.RegisterAddon(SpaceStashInventory:new(), false, "", {
 	"Gemini:Logging-1.2", 
