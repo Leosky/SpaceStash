@@ -23,7 +23,7 @@ local inspect
 -----------------------------------------------------------------------------------------------
 -- Constants and Defaults parameters
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "SpaceStashInventory-Beta", 5
+local MAJOR, MINOR = "SpaceStashInventory-Beta", 8
 
 local kcrSelectedText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrNormalText = ApolloColor.new("UI_BtnTextHoloNormal")
@@ -52,6 +52,7 @@ tDefaults.location.x = 64
 tDefaults.location.y = 64
 tDefaults.currencies = {eCurrencyType = Money.CodeEnumCurrencyType.Renown}
 tDefaults.SelectedTab = codeEnumTabDisplay.BagsTab
+tDefaults.auto = {}
 tDefaults.auto.Repair = true
 tDefaults.auto.SellJunks = true
 
@@ -96,9 +97,8 @@ function SpaceStashInventory:OnRestore(eLevel, tData )
 	if tData == nil then
 		self:ResetConfig()
 	else
-		if tData.version.MINOR ~= 5 then
+		if tData.version.MINOR < 8 then
 			self:ResetConfig()
-			self.tConfig.version.MINOR = 5
 		else
 			self.tConfig = tData
 		end
@@ -141,11 +141,13 @@ function SpaceStashInventory:OnDocLoaded()
 				self.wndCurrency = self.wndCurrencies:FindChild("CurrencyWindow")
 				self.wndCash = self.wndCurrencies:FindChild("CashWindow")
 		
+
+		self.buttonPlayerButton = self.wndMain:FindChild("PlayerButton")
 		self.wndPlayerMenuFrame = self.wndMain:FindChild("PlayerMenuFrame")
-			self.radioElderGems = self.wndPlayerMenuFrame("ElderGemsRadio")
-			self.radioPrestige = self.wndPlayerMenuFrame("PrestigeRadio")
-			self.radioRenown = self.wndPlayerMenuFrame("RenownRadio")
-			self.radioCraftingVoucher = self.wndPlayerMenuFrame("CraftingVouchersRadio")
+			self.radioElderGems = self.wndPlayerMenuFrame:FindChild("ElderGemsRadio")
+			self.radioPrestige = self.wndPlayerMenuFrame:FindChild("PrestigeRadio")
+			self.radioRenown = self.wndPlayerMenuFrame:FindChild("RenownRadio")
+			self.radioCraftingVoucher = self.wndPlayerMenuFrame:FindChild("CraftingVouchersRadio")
 
 			self.sliderIconSize = self.wndPlayerMenuFrame:FindChild("IconSizeSlider")
 				self.wndIconSize= self.wndPlayerMenuFrame:FindChild("IconSizeWindow")
@@ -153,7 +155,7 @@ function SpaceStashInventory:OnDocLoaded()
 				self.wndRowSize = self.wndPlayerMenuFrame:FindChild("RowSizeWindow")
 
 			self.checkerAutoSellJunks = self.wndPlayerMenuFrame:FindChild("AutoSellJunksChecker")
-			self.checkerAutoRepair = self.selfwndPlaye:FindChild("AutoRepariChecker")
+			self.checkerAutoRepair = self.wndPlayerMenuFrame:FindChild("AutoRepairChecker")
 		
 		self.xmlDoc = nil
 		
@@ -163,7 +165,7 @@ function SpaceStashInventory:OnDocLoaded()
 		self.glog = GeminiLogging:GetLogger({
 		  level = GeminiLogging.INFO,
 		  pattern = "%d [%c:%n] %l - %m",
-		  appender = "GeminiConsole"
+		  appender = "Print"
 		})
 
 		if self.tConfig.SelectedTab == codeEnumTabDisplay.BagsTab then
@@ -196,7 +198,22 @@ function SpaceStashInventory:OnDocLoaded()
 			self.wndTradeskillsBagTabFrame:Show(false)
 		end
 
-		self:OnPlayerButtonUncheck()
+		if self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.ElderGems then
+			self.radioElderGems:SetCheck(true)
+		elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Prestige then
+			self.radioPrestige:SetCheck(true)
+		elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Renown then
+			self.radioRenown:SetCheck(true)
+		elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.CraftingVouchers then
+			self.radioCraftingVoucher:SetCheck(true)
+		end
+		
+		self.checkerAutoSellJunks:SetCheck(self.tConfig.auto.SellJunks)
+		self.checkerAutoRepair:SetCheck(self.tConfig.auto.Repair)
+		self.sliderIconSize:SetValue(self.tConfig.IconSize)
+		self.sliderRowSize:SetValue(self.tConfig.RowSize)
+		self.wndIconSize:SetText(tostring(self.tConfig.IconSize))
+		self.wndRowSize:SetText(tostring(self.tConfig.RowSize))
 		
 		self:Redraw()
 		
@@ -218,7 +235,7 @@ function SpaceStashInventory:OnDocLoaded()
 		Apollo.RegisterSlashCommand("ssi", "OnSSCmd", self)
 		-- Do additional Addon initialization here
 
-
+		Apollo.RegisterEventHandler("CharacterCreated", "OnInventoryDisplayChange", GeminiAddon)
 	end
 end
 
@@ -329,20 +346,20 @@ end
 --@return nSoldValue the total value of item sold.
 --should i have to add a whitelite to ignore items that have been buyback ?
 function SpaceStashInventory:SellJunks()
-	local arJunks = self.GetItemByQuality(Item.codeEnumQuality.Inferior)
+	local arJunks = self:GetItemByQuality(Item.CodeEnumItemQuality.Inferior)
 	local nSoldValue = 0
 	for _, item in ipairs(arJunks) do
-		if not item:IsSalvagable() and item:IsSellable() and item:GetSellPrice() > 0 then	--check behavior for 'refunding' token items
-			SellItemToVendorById(item:GetInventoryId(), item:GetStackCount())
+		if not item.itemInBag:CanSalvage() and item.itemInBag:GetSellPrice() then	--check behavior for 'refunding' token items
+			SellItemToVendorById(item.itemInBag:GetInventoryId(), item.itemInBag:GetStackCount())
 		end
 	end
 end
 
-function SpaceStashInventory.GetItemByQuality(codeEnumQuality)
-	local codeEnumItemQuality = Item.codeEnumItemQuality --not loaded in general because should not loaded often.
+function SpaceStashInventory:GetItemByQuality(codeEnumQuality)
+	local codeEnumItemQuality = Item.CodeEnumItemQuality --not loaded in general because should not loaded often.
 	local arItems = {}
 	for _, item in ipairs(GameLib.GetPlayerUnit():GetInventoryItems()) do 
-		if item:GetQuality() > codeEnumItemQuality.Inferior then
+		if item.itemInBag:GetItemQuality() == codeEnumItemQuality.Inferior then
 			table.insert(arItems, item)
 		end
 	end
@@ -370,11 +387,11 @@ function SpaceStashInventory:OnAutoRepairUnchecked()
 		self.tConfig.auto.Repair = false
 end
 
-function SpaceStashInventory:onAutoSellJunksChecked()
+function SpaceStashInventory:OnAutoSellJunksChecked()
 	self.tConfig.auto.SellJunks = true		
 end	
 
-function SpaceStashInventory:onAutoSellJunksUnhecked()
+function SpaceStashInventory:OnAutoSellJunksUnchecked()
 	self.tConfig.auto.SellJunks = false
 end
 
@@ -430,7 +447,7 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 				]]
 			)
 	elseif strParam == "info" then 
-		self.glog:info(self)
+		self.glog:info(self.tConfig)
 	elseif strParam == "redraw" then
 		self:Redraw()
 	elseif string.find(string.lower(strParam), "option") ~= nil then
@@ -447,6 +464,7 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 				self.wndCurrency:SetMoneySystem(eType)
 				self:UpdateCashAmount()
 				self:OnPlayerButtonUncheck()
+				self.buttonPlayerButton:SetCheck(false)	
 			else
 				ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Command, args[3] .. " is not a valid currency[ElderGems,Prestige,Renown,CraftingVouchers]")
 			end
@@ -457,6 +475,7 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 				self:RowSizeChange(size)
 				self:OnInventoryDisplayChange()
 				self:OnPlayerButtonUncheck()
+				self.buttonPlayerButton:SetCheck(false)
 			end
 		elseif string.lower(args[2]) == "iconsize" then
 			local size = string.match(args[3],"%d+")
@@ -464,6 +483,7 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 				self:IconSizeChange(size)
 				self:OnInventoryDisplayChange()
 				self:OnPlayerButtonUncheck()
+				self.buttonPlayerButton:SetCheck(false)
 			end
 		elseif string.lower(args[2]) == "autoselljunks" then
 			if args[3] == string.lower("true") then
@@ -472,6 +492,7 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 			elseif args[3] == string.lower("false") then
 				self.tConfig.auto.SellJunks = false
 				self:OnPlayerButtonUncheck()
+				self.buttonPlayerButton:SetCheck(false)
 			end
 		elseif string.lower(args[2]) == "autorepair" then
 			if args[3] == string.lower("true") then
@@ -480,6 +501,7 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 			elseif args[3] == string.lower("false") then
 				self.tConfig.auto.Repair = false
 				self:OnPlayerButtonUncheck()
+				self.buttonPlayerButton:SetCheck(false)
 			end
 		end
 	end
@@ -701,34 +723,29 @@ function SpaceStashInventory:OnPlayerButtonUncheck( wndHandler, wndControl, eMou
 
 	self.checkerAutoSellJunks:SetCheck(self.tConfig.auto.SellJunks)
 	self.checkerAutoRepair:SetCheck(self.tConfig.auto.Repair)
-	self.sliderIconSize:setValue(self.tConfig.IconSize)
-	self.sliderRowSize:setValue(self.tConfig.RowSize)
+	self.sliderIconSize:SetValue(self.tConfig.IconSize)
+	self.sliderRowSize:SetValue(self.tConfig.RowSize)
 	self.wndIconSize:SetText(tostring(self.tConfig.IconSize))
 	self.wndRowSize:SetText(tostring(self.tConfig.RowSize))
 end
 
 function SpaceStashInventory:OnIconSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
 	self:IconSizeChange(fNewValue)
-	self.wndIconSize:SetText(tostring(fNewValue))
+	self.wndIconSize:SetText(fNewValue)
 	self:OnInventoryDisplayChange()
 end
 
 function SpaceStashInventory:OnRowSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
-	self:RowSizeChange(strText)
-	self.wndRowSize:SetText(tostring(fNewValue))
+	self:RowSizeChange(fNewValue)
+	self.wndRowSize:SetText(fNewValue)
 	self:OnInventoryDisplayChange()
 end
 
 function SpaceStashInventory:OnOptionAccept( wndHandler, wndControl, eMouseButton )
-
-	self:IconSizeChange(tonumber(self.wndIconSize:GetText()))
-	self:RowSizeChange(tonumber(self.wndRowSize:GetText()))
-	
-	self.wndPlayerMenuFrame:Show(false,true)
-	self:OnInventoryDisplayChange()
+	self.buttonPlayerButton:SetCheck(false)
+	self:OnPlayerButtonUncheck()
 end
 --
-
 
 
 -----------------------------------------------------------------------------------------------
