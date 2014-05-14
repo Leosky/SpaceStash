@@ -1,0 +1,1 @@
+http://www.curse.com/ws-addons/WildStar/220186-spacestash
