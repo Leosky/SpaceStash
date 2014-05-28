@@ -1,7 +1,7 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashCore-Beta", 1
+local MAJOR, MINOR = "SpaceStashCore-Beta", 4
 
 local tDefaults = {}
 tDefaults.tConfig = {}
@@ -17,6 +17,7 @@ tDefaults.tConfig.auto.inventory.commoditiesexchange = false
 tDefaults.tConfig.auto.inventory.mailbox = false
 tDefaults.tConfig.auto.inventory.engravingstation = false
 tDefaults.tConfig.auto.inventory.craftingstation = false
+tDefaults.tConfig.auto.inventory.sort = 0
 tDefaults.tConfig.auto.repair = false
 tDefaults.tConfig.auto.sell = false
 tDefaults.tConfig.auto.sellSalvagables = false
@@ -33,16 +34,26 @@ local SpaceStashInventory, SpaceStashBank
 
 -- Replaces MyAddon:OnLoad
 function SpaceStashCore:OnInitialize()
+  Apollo.CreateTimer("SSCLoadingTimer", 5.0, false)
+  Apollo.RegisterTimerHandler("SSCLoadingTimer", "OnLoadingTimer", self)
   self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashCore.xml")
   self.xmlDoc:RegisterCallback("OnDocumentReady", self)
   self.bWindowCreated = false
   self.bReady = false
-  self.bSavedDataRestored = true
+  self.bSavedDataRestored = false
   GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
   inspect = Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
   L = GeminiLocale:GetLocale("SpaceStashCore", true)
   SpaceStashInventory = Apollo.GetAddon("SpaceStashInventory")
   SpaceStashBank = Apollo.GetAddon("SpaceStashBank")
+end
+
+function SpaceStashCore:OnLoadingTimer()
+  Apollo.StopTimer("SSICoadingTimer")
+  if self.bSavedDataRestored == false and self.bWindowCreated == true then
+    glog:info("SpaceStashCore no data to restore.")
+    self:OnSpaceStashCoreReady()
+  end
 end
 
 function SpaceStashCore:OnDocumentReady()
@@ -54,62 +65,31 @@ function SpaceStashCore:OnDocumentReady()
 
   self.SSCOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSCOptionsFrame", self.targetFrame, self)
   self.SSCAutoVendor = self.SSCOptionsFrame:FindChild("SSCAutoVendor")
-  self.SSCAutoVendor:SetCheck(self.tConfig.auto.inventory.vendor)
   self.SSCAutoBank = self.SSCOptionsFrame:FindChild("SSCAutoBank")
-  self.SSCAutoBank:SetCheck(self.tConfig.auto.inventory.bank)
   self.SSCAutoAH = self.SSCOptionsFrame:FindChild("SSCAutoAH")
-  self.SSCAutoAH:SetCheck(self.tConfig.auto.inventory.auctionhouse)
   self.SSCAutoCE = self.SSCOptionsFrame:FindChild("SSCAutoCE")
-  self.SSCAutoCE:SetCheck(self.tConfig.auto.inventory.commoditiesexchange)
   self.SSCAutoMailbox = self.SSCOptionsFrame:FindChild("SSCAutoMailbox")
-  self.SSCAutoMailbox:SetCheck(self.tConfig.auto.inventory.mailbox)
   self.SSCAutoES = self.SSCOptionsFrame:FindChild("SSCAutoES")
-  self.SSCAutoES:SetCheck(self.tConfig.auto.inventory.engravingstation)
   self.SSCAutoCS = self.SSCOptionsFrame:FindChild("SSCAutoCS")
-  self.SSCAutoCS:SetCheck(self.tConfig.auto.inventory.craftingstation)
+  self.SSCInventorySortChooserButton = self.SSCOptionsFrame:FindChild("InventorySortChooserButton")
   self.SSCAutoRepair = self.SSCOptionsFrame:FindChild("SSCAutoRepair")
-  self.SSCAutoRepair:SetCheck(self.tConfig.auto.repair)
   self.SSCAutoSell = self.SSCOptionsFrame:FindChild("SSCAutoSell")
-  self.SSCAutoSell:SetCheck(self.tConfig.auto.sell)
   self.SSCSellSavagable = self.SSCOptionsFrame:FindChild("SSCSellSavagable")
-  self.SSCSellSavagable:SetCheck(self.tConfig.auto.sellSalvagables)
   self.SSCSellQualityChooserButton = self.SSCOptionsFrame:FindChild("SellQualityChooserButton")
-
-  if self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Inferior then
-    self.SSCSellQualityChooserButton:FindChild("Choice1"):SetCheck(true)
-    self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice1"):GetText())
-  elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Average then
-    self.SSCSellQualityChooserButton:FindChild("Choice2"):SetCheck(true)
-    self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice2"):GetText())
-  elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Good then
-    self.SSCSellQualityChooserButton:FindChild("Choice3"):SetCheck(true)
-    self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice3"):GetText())
-  elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Excellent then
-    self.SSCSellQualityChooserButton:FindChild("Choice4"):SetCheck(true)
-    self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice4"):GetText())
-  elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Superb then
-    self.SSCSellQualityChooserButton:FindChild("Choice5"):SetCheck(true)
-    self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice5"):GetText())
-  elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Legendary then
-    self.SSCSellQualityChooserButton:FindChild("Choice6"):SetCheck(true)
-    self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice6"):GetText())
-  elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Artifact then
-    self.SSCSellQualityChooserButton:FindChild("Choice7"):SetCheck(true)
-    self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice7"):GetText())
-  end
+  self.SellWhitelist = self.SSCOptionsFrame:FindChild("SellWhitelist")
+  self.SellBlacklist = self.SSCOptionsFrame:FindChild("SellBlacklist")
 
   -----SSI OPtions -----
   self.SSIOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSIOptionsFrame", self.targetFrame, self)
   self.SSIElderGemsButton = self.SSIOptionsFrame:FindChild("ElderGemsButton")
   self.SSIPrestigeButton = self.SSIOptionsFrame:FindChild("PrestigeButton")
-  self.SSIRenownButton = self.SSIOptionsFrame:FindChild("RenownButton")
-  self.SSICraftingVouchersButton = self.SSIOptionsFrame:FindChild("CraftingVouchersButton")
+  self.SSIRenownButton = self.SSIOptionsFrame:FindChild("RenownButton")  self.SSICraftingVouchersButton = self.SSIOptionsFrame:FindChild("CraftingVouchersButton")
   self.SSIIconsSizeSlider = self.SSIOptionsFrame:FindChild("SSIIconsSizeSlider")
   self.SSIIconsSizeText = self.SSIOptionsFrame:FindChild("SSIIconsSizeText")
   self.SSIRowsSizeSlider = self.SSIOptionsFrame:FindChild("SSIRowsSizeSlider")
   self.SSIRowsSizeText = self.SSIOptionsFrame:FindChild("SSIRowsSizeText")
 
-
+  --- SSB Options ---
   self.SSBOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSBOptionsFrame", self.targetFrame, self)
   self.SSBIconsSizeSlider = self.SSBOptionsFrame:FindChild("SSBIconsSizeSlider")
   self.SSBIconsSizeText = self.SSBOptionsFrame:FindChild("SSBIconsSizeText")
@@ -180,12 +160,110 @@ function SpaceStashCore:OnRestoreSettings(eLevel, tSavedData)
 
   self.bSavedDataRestored = true
 
-  if self.bWindowCreated then
+  if self.bWindowCreated and self.bReady == false then
     self:OnSpaceStashCoreReady()
+  elseif self.bReady then
+    self.SSCAutoCS:SetCheck(self.tConfig.auto.inventory.craftingstation)
+    self.SSCAutoSell:SetCheck(self.tConfig.auto.sell)
+    self.SSCSellSavagable:SetCheck(self.tConfig.auto.sellSalvagables)
+    self.SSCAutoRepair:SetCheck(self.tConfig.auto.repair)
+    self.SSCAutoES:SetCheck(self.tConfig.auto.inventory.engravingstation)
+
+    self.SSCAutoMailbox:SetCheck(self.tConfig.auto.inventory.mailbox)
+    self.SSCAutoCE:SetCheck(self.tConfig.auto.inventory.commoditiesexchange)
+    self.SSCAutoAH:SetCheck(self.tConfig.auto.inventory.auctionhouse)
+    self.SSCAutoBank:SetCheck(self.tConfig.auto.inventory.bank)
+    self.SSCAutoVendor:SetCheck(self.tConfig.auto.inventory.vendor)
+    
+    if self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Inferior then
+      self.SSCSellQualityChooserButton:FindChild("Choice1"):SetCheck(true)
+      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice1"):GetText())
+    elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Average then
+      self.SSCSellQualityChooserButton:FindChild("Choice2"):SetCheck(true)
+      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice2"):GetText())
+    elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Good then
+      self.SSCSellQualityChooserButton:FindChild("Choice3"):SetCheck(true)
+      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice3"):GetText())
+    elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Excellent then
+      self.SSCSellQualityChooserButton:FindChild("Choice4"):SetCheck(true)
+      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice4"):GetText())
+    elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Superb then
+      self.SSCSellQualityChooserButton:FindChild("Choice5"):SetCheck(true)
+      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice5"):GetText())
+    elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Legendary then
+      self.SSCSellQualityChooserButton:FindChild("Choice6"):SetCheck(true)
+      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice6"):GetText())
+    elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Artifact then
+      self.SSCSellQualityChooserButton:FindChild("Choice7"):SetCheck(true)
+      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice7"):GetText())
+    end
+
+    if self.tConfig.auto.inventory.sort == 0 then
+      self.SSCInventorySortChooserButton:FindChild("Choice1"):SetCheck(true)
+      self.SSCInventorySortChooserButton:SetText(self.SSCInventorySortChooserButton:FindChild("Choice1"):GetText())
+    elseif self.tConfig.auto.inventory.sort == 1 then
+      self.SSCInventorySortChooserButton:FindChild("Choice2"):SetCheck(true)
+      self.SSCInventorySortChooserButton:SetText(self.SSCInventorySortChooserButton:FindChild("Choice2"):GetText())
+    elseif self.tConfig.auto.inventory.sort == 2 then
+      self.SSCInventorySortChooserButton:FindChild("Choice3"):SetCheck(true)
+      self.SSCInventorySortChooserButton:SetText(self.SSCInventorySortChooserButton:FindChild("Choice3"):GetText())
+    elseif self.tConfig.auto.inventory.sort == 3 then
+      self.SSCInventorySortChooserButton:FindChild("Choice4"):SetCheck(true)
+      self.SSCInventorySortChooserButton:SetText(self.SSCInventorySortChooserButton:FindChild("Choice4"):GetText())
+    end
   end
 end
 
 function SpaceStashCore:OnSpaceStashCoreReady()
+
+self.SSCAutoCS:SetCheck(self.tConfig.auto.inventory.craftingstation)
+self.SSCAutoSell:SetCheck(self.tConfig.auto.sell)
+self.SSCSellSavagable:SetCheck(self.tConfig.auto.sellSalvagables)
+self.SSCAutoRepair:SetCheck(self.tConfig.auto.repair)
+self.SSCAutoES:SetCheck(self.tConfig.auto.inventory.engravingstation)
+
+self.SSCAutoMailbox:SetCheck(self.tConfig.auto.inventory.mailbox)
+self.SSCAutoCE:SetCheck(self.tConfig.auto.inventory.commoditiesexchange)
+self.SSCAutoAH:SetCheck(self.tConfig.auto.inventory.auctionhouse)
+self.SSCAutoBank:SetCheck(self.tConfig.auto.inventory.bank)
+self.SSCAutoVendor:SetCheck(self.tConfig.auto.inventory.vendor)
+
+if self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Inferior then
+  self.SSCSellQualityChooserButton:FindChild("Choice1"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice1"):GetText())
+elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Average then
+  self.SSCSellQualityChooserButton:FindChild("Choice2"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice2"):GetText())
+elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Good then
+  self.SSCSellQualityChooserButton:FindChild("Choice3"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice3"):GetText())
+elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Excellent then
+  self.SSCSellQualityChooserButton:FindChild("Choice4"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice4"):GetText())
+elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Superb then
+  self.SSCSellQualityChooserButton:FindChild("Choice5"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice5"):GetText())
+elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Legendary then
+  self.SSCSellQualityChooserButton:FindChild("Choice6"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice6"):GetText())
+elseif self.tConfig.auto.sellQualityTreshold == Item.CodeEnumItemQuality.Artifact then
+  self.SSCSellQualityChooserButton:FindChild("Choice7"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice7"):GetText())
+end
+
+if self.tConfig.auto.inventory.sort == 0 then
+  self.SSCInventorySortChooserButton:FindChild("Choice1"):SetCheck(true)
+  self.SSCInventorySortChooserButton:SetText(self.SSCInventorySortChooserButton:FindChild("Choice1"):GetText())
+elseif self.tConfig.auto.inventory.sort == 1 then
+  self.SSCInventorySortChooserButton:FindChild("Choice2"):SetCheck(true)
+  self.SSCInventorySortChooserButton:SetText(self.SSCInventorySortChooserButton:FindChild("Choice2"):GetText())
+elseif self.tConfig.auto.inventory.sort == 2 then
+  self.SSCInventorySortChooserButton:FindChild("Choice3"):SetCheck(true)
+  self.SSCInventorySortChooserButton:SetText(self.SSCInventorySortChooserButton:FindChild("Choice3"):GetText())
+elseif self.tConfig.auto.inventory.sort == 3 then
+  self.SSCInventorySortChooserButton:FindChild("Choice4"):SetCheck(true)
+  self.SSCInventorySortChooserButton:SetText(self.SSCInventorySortChooserButton:FindChild("Choice4"):GetText())
+end
 
   Apollo.RegisterSlashCommand("ssc", "OnSlashCommand", self)
   Apollo.RegisterEventHandler("SpaceStashCore_OpenOptions", "OnOpenOptions", self)
@@ -248,7 +326,8 @@ function SpaceStashCore:OnOpenOptions( oHandler )
   end
 end
 
-function SpaceStashCore:OnClose( wndHandler, wndControl, eMouseButton )
+function SpaceStashCore:OnClose( ... )
+
   self.wndMain:Show(false,true)
 end
 
@@ -274,6 +353,9 @@ function SpaceStashCore:OnModuleButton(strType,strName)
   end
 end
 
+function  SpaceStashCore:OnEscape(...)
+	glog:info(...)
+end
 
 function SpaceStashCore:SpaceStashCoreButtonCheck()
   self.SSCOptionsFrame:Show(true)
@@ -416,6 +498,37 @@ function SpaceStashCore:OnSellSalvagableChange( wndHandler, wndControl )
   self.tConfig.auto.sellSalvagables = self.SSCSellSavagable:IsChecked()
 end
 
+
+
+function SpaceStashCore:OnInventorySortToggle( wndHandler, wndControl )
+  self.SSCInventorySortChooserButton:FindChild("ChoiceContainer"):Show(self.SSCInventorySortChooserButton:IsChecked(),true)
+end
+
+function SpaceStashCore:OnInventorySortChooserContainerClose()
+  self.SSCInventorySortChooserButton:SetCheck(false)
+end
+
+function SpaceStashCore:OnInventorySortSelected(wndHandler, wndControl)
+  if wndHandler == wndControl then
+    if wndHandler:GetName() == "Choice1" then
+      tDefaults.tConfig.auto.inventory.sort = 0
+    elseif wndHandler:GetName() == "Choice2" then
+      tDefaults.tConfig.auto.inventory.sort = 1
+    elseif wndHandler:GetName() == "Choice3" then
+      tDefaults.tConfig.auto.inventory.sort = 2
+    elseif wndHandler:GetName() == "Choice4" then
+      tDefaults.tConfig.auto.inventory.sort = 3
+    end
+    
+    self.SSCInventorySortChooserButton:SetText(wndHandler:GetText())
+    self.SSCInventorySortChooserButton:FindChild("ChoiceContainer"):Show(false,true)
+  end
+  self:OnInventorySortChooserContainerClose()
+  if SpaceStashInventory then
+    SpaceStashInventory:SetSortMehtod(tDefaults.tConfig.auto.inventory.sort)
+  end
+end
+
 function SpaceStashCore:OnSellQualityChooserToggle( wndHandler, wndControl )
   self.SSCSellQualityChooserButton:FindChild("ChoiceContainer"):Show(self.SSCSellQualityChooserButton:IsChecked(),true)
 end
@@ -473,6 +586,27 @@ function SpaceStashCore:SellItems()
     end
   end
 end
+
+function SpaceStashCore:OnSellWhitelistChange()
+-- 	local lines = {}
+
+-- 	for line in string.gmatch(self.SellWhitelist:GetText(), "([%w%p]*)\n") do 
+-- 		table.insert(lines, line) 
+-- 	end
+-- 	local key, value
+-- 	for _,v in ipairs(lines) do
+-- 		key, value = string.match(self.SellWhitelist:GetText(), "(%w*):(%w*)")
+-- 		if key ~= nil and value ~= nil then
+-- 			glog:info(key .. "=" .. value)
+-- 		end
+-- 		key, value = nil, nil
+-- 	end
+-- 	glog:info(lines)
+end
+
+
+
+------------------------------------------------------------------------
 
 function SpaceStashCore:OnShowBank() 
   if not self.tConfig.auto.inventory.bank then return end

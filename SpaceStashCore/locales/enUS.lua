@@ -1,19 +1,33 @@
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("SpaceStashCore", "enUS", true)
+if not L then return end
+
 L["SSOptions"] = "SpaceStash's Options"
+L["SSCClose"] = "Close"
 L["SSCOptions"] = "Core"
-L["SSCGROUP1"] = "Automatic display"
-L["SSCGR1OPT1"] = "Display inventory when visiting a vendor"
-L["SSCGR1OPT2"] = "Display inventory at bank"
-L["SSCGR1OPT3"] = "Display inventory at auction house"
-L["SSCGR1OPT4"] = "Display inventory at commodities exchange"
-L["SSCGR1OPT5"] = "Display inventory when opening mailbox"
-L["SSCGR1OPT6"] = "Display inventory at engraving station"
-L["SSCGR1OPT7"] = "Display inventory when tradeskill window is opened"
-L["SSCGROUP2"] = "Automatisations"
-L["SSCGR2OPT1"] = "Repair stuff when visiting a vendor"
-L["SSCGR2OPT2"] = "Automaticaly sell items when visiting a vendor"
-L["SSCGR2OPT3"] = "Sell salvagable items"
-L["SSCGR2OPT4"] = "Item's quality threshold to sell"
+
+L["SSCDISPLAYGROUP"] = "Automatic display"
+L["SSCDISPLAYGVENDOR"] = "Display inventory when visiting a vendor"
+L["SSCDISPLAYGBANK"] = "Display inventory at bank"
+L["SSCDISPLAYGAUCTION"] = "Display inventory at auction house"
+L["SSCDISPLAYGEXCHANGE"] = "Display inventory at commodities exchange"
+L["SSCDISPLAYGMAILBOX"] = "Display inventory when opening mailbox"
+L["SSCDISPLAYGRUNE"] = "Display inventory at engraving station"
+L["SSCDISPLAYGCRAFTING"] = "Display inventory when tradeskill window is opened"
+
+L["SSCSORTGROUP"] = "Bags sorting"
+L["SSCSORTGINVENTORY"] = "Inventory sorting method"
+
+L["Off"] = "Off"
+L["Alphabetical"] = "Alphabetical"
+L["Quality"] = "Quality"
+L["Category"] = "Category"
+
+L["SSCVENDORGROUP"] = "Automatisations"
+L["SSCVENDORGREPAIR"] = "Repair stuff when visiting a vendor"
+L["SSCVENDORGSELL"] = "Automaticaly sell items when visiting a vendor"
+L["SSCVENDORGSELLSALVAGABLE"] = "Sell salvagable items"
+L["SSCVENDORGSELLQUALITY"] = "Item's quality threshold to sell"
+
 L["Inferior"] = "Inferior"
 L["Average"] = "Average"
 L["Good"] = "Good"
@@ -21,6 +35,7 @@ L["Excellent"] = "Excellent"
 L["Superb"] = "Superb"
 L["Legendary"] = "Legendary"
 L["Artifact"] = "Artifact"
+
 L["SSCGR2OPT5"] = "Whitelist (Items always sold)"
 L["SSCGR2OPT6"] = "Blacklist (Items never sold)"
 

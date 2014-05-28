@@ -1,4 +1,6 @@
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("SpaceStashBank", "enUS", true)
+if not L then return end
+ 	  	
 L["BANKSTASH"] = "Bank"
 L["NEXTBAGCOST"] = "Next bag cost"
 L["BUYBANKBAGSLOT"] = "Click to buy this slot."

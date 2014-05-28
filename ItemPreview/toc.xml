@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="Carbine" APIVersion="8" Name="ItemPreview" Description="">
+<Addon Author="Carbine" APIVersion="8" Name="ItemPreview" Description="" Version="6803">
     <Script Name="ItemPreview.lua"/>
     <Form Name="ItemPreview.xml"/>
 </Addon>

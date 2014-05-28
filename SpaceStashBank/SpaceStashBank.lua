@@ -1,7 +1,7 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashBank-Beta", 1
+local MAJOR, MINOR = "SpaceStashBank-Beta", 4
 
 local CodeEnumTabDisplay = {
   None = 0,
@@ -20,6 +20,8 @@ tDefaults.tConfig.location.x = 64
 tDefaults.tConfig.location.y = 64
 tDefaults.tConfig.SelectedTab = CodeEnumTabDisplay.None
 
+local tItemSlotBGPixie = {loc = {fPoints = {0,0,1,10},nOffsets = {0,0,0,0},},strSprite="WhiteFill", cr= "black",fRotation="0"}
+
 -----------------------------------------------------------------------------------------------
 -- Libraries
 -----------------------------------------------------------------------------------------------
@@ -28,16 +30,26 @@ local L = GeminiLocale:GetLocale("SpaceStashBank", true)
 
 -- Replaces MyAddon:OnLoad
 function SpaceStashBank:OnInitialize()
+  Apollo.CreateTimer("SSBLoadingTimer", 5.0, false)
+  Apollo.RegisterTimerHandler("SSBLoadingTimer", "OnLoadingTimer", self)
   self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashBank.xml")
   self.xmlDoc:RegisterCallback("OnDocumentReady", self)
   self.bWindowCreated = false
   self.bReady = false
-  self.bSavedDataRestored = true
+  self.bSavedDataRestored = false
   GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
   inspect = Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
   
 end
 
+function SpaceStashBank:OnLoadingTimer()
+  Apollo.StopTimer("SSBLoadingTimer")
+
+  if self.bSavedDataRestored == false and self.bWindowCreated == true then
+  	glog:info("SpaceStashBank no data to restore.")
+    self:OnSpaceStashBankReady()
+  end
+end
 
 function SpaceStashBank:OnDocumentReady()
   self.wndMain = Apollo.LoadForm(self.xmlDoc, "SpaceStashBankWindow", nil, self)
@@ -58,11 +70,11 @@ function SpaceStashBank:OnDocumentReady()
    self.btnClose = self.wndMenuFrame:FindChild("CloseButton")
    self.wndBankBagsTabFrame = self.wndTopFrame:FindChild("BankBagsTabFrame")
     self.wndBankBags = {
-      self.wndBankBagsTabFrame:FindChild("BagArtWindow1"),
-      self.wndBankBagsTabFrame:FindChild("BagArtWindow2"),
-      self.wndBankBagsTabFrame:FindChild("BagArtWindow3"),
-      self.wndBankBagsTabFrame:FindChild("BagArtWindow4"),
-      self.wndBankBagsTabFrame:FindChild("BagArtWindow5")
+      self.wndBankBagsTabFrame:FindChild("ItemWidget1"),
+      self.wndBankBagsTabFrame:FindChild("ItemWidget2"),
+      self.wndBankBagsTabFrame:FindChild("ItemWidget3"),
+      self.wndBankBagsTabFrame:FindChild("ItemWidget4"),
+      self.wndBankBagsTabFrame:FindChild("ItemWidget5")
     }
 
   self.wndBankFrame = self.wndMain:FindChild("BankFrame")
@@ -139,13 +151,13 @@ function SpaceStashBank:OnSpaceStashBankReady()
         v:FindChild("BuyBankSlotButton"):Destroy()
       elseif k == nBankBagSlots +1 then
         v:Show(true)
-        v:FindChild("BuyBankSlotButton"):SetTooltip(L["BUYBANKBAGSLOT"])
       end
     end
   end
 
-  self:OnRowSizeChange()
+  
   self:UpdateTabState()
+  self:OnIconSizeChange()
   self:UpdateWindowSize()
 
   GeminiLocale:TranslateWindow(L, self.wndMain)
@@ -225,6 +237,8 @@ end
 function SpaceStashBank:OnBankBagsTabChecked( wndHandler, wndControl, eMouseButton )
   self.tConfig.SelectedTab = CodeEnumTabDisplay.BankBags
   self:UpdateTabState()
+
+  self:OnIconSizeChange()
   self:UpdateWindowSize();
 end
 
@@ -303,9 +317,11 @@ function SpaceStashBank:OnGenerateBagTooltip( wndControl, wndHandler, tType, ite
 end
 
 function SpaceStashBank:OnBagDragDropCancel( wndHandler, wndControl, strType, iData, eReason, bDragDropHasBeenReset )
+
 end
 
 function SpaceStashBank:OnDragDropNothingCursor( wndHandler, wndControl, strType, iData )
+
 end
 
 function SpaceStashBank:OnEquippedItemChanged()
@@ -323,8 +339,26 @@ end
 
 function SpaceStashBank:OnIconSizeChange()
 
-  self.wndBank:SetSquareSize(self.tConfig.IconSize, self.tConfig.IconSize) 
-  self.wndBank:SetBoxesPerRow(self.tConfig.RowSize)
+  self.wndBank:SetSquareSize(self.tConfig.IconSize, self.tConfig.IconSize)
+
+  self.wndBankBagsTabFrame:SetAnchorOffsets(1,self.wndMenuFrame:GetHeight(),0,self.wndMenuFrame:GetHeight() + self.tConfig.IconSize )
+
+  
+
+  for k,v in ipairs(self.wndBankBags) do
+  	v:SetAnchorOffsets(0,0,self.tConfig.IconSize,self.tConfig.IconSize)
+  end
+  self.wndBankBagsTabFrame:ArrangeChildrenHorz(0)
+
+  if self.tConfig.SelectedTab == CodeEnumTabDisplay.BankBags then
+    self.topFrameHeight = self.wndMenuFrame:GetHeight() + self.wndBankBagsTabFrame:GetHeight()
+  else
+    self.topFrameHeight = self.wndMenuFrame:GetHeight()
+  end
+
+  self.wndTopFrame:SetAnchorOffsets(0,0,0,self.topFrameHeight)
+
+  self:OnRowSizeChange()
 
 end
 
@@ -351,7 +385,20 @@ function SpaceStashBank:UpdateWindowSize()
 
   self.bottomFrameHeight = self.wndBottomFrame:GetHeight()
 
-  self.wndBankFrame:SetAnchorOffsets(0,self.topFrameHeight,0,-self.bottomFrameHeight)
+  self.wndBankFrame:SetAnchorOffsets(0,self.topFrameHeight-1,0,-self.bottomFrameHeight)
+
+  for _,v in ipairs(self.wndBankBags) do
+    local BagArtWindow = v:FindChild("BagArtWindow")
+    BagArtWindow:DestroyAllPixies()
+
+    if BagArtWindow:FindChild("Bag"):GetItem() then
+      BagArtWindow:FindChild("Capacity"):SetText(BagArtWindow:FindChild("Bag"):GetItem():GetBagSlots())
+      BagArtWindow:AddPixie(tItemSlotBGPixie)
+    else
+      BagArtWindow:FindChild("Capacity"):SetText()
+    end
+
+  end
 
   self:UpdateLocation()
 

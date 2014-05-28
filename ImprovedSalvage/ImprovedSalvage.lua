@@ -7,7 +7,6 @@ require "Item"
 local ImprovedSalvage = {}
 
 local kidBackpack = 0
-local knSavedVersion = 1
 
 function ImprovedSalvage:new(o)
 	o = o or {}
@@ -17,44 +16,18 @@ function ImprovedSalvage:new(o)
 	return o
 end
 
-function ImprovedSalvage:OnSave(eType)
-	if eType ~= GameLib.CodeEnumAddonSaveLevel.Account then
-		return
-	end
-	
-	local locWindowLocation = self.wndMain and self.wndMain:GetLocation() or self.locSavedWindowLoc
-
-	local tSaved =
-	{
-		tWindowLocation = locWindowLocation and locWindowLocation:ToTable() or nil,
-		nSaveVersion = knSaveVersion
-	}
-	return tSaved
-end
-
-function ImprovedSalvage:OnRestore(eType, tSavedData)
-	if not tSavedData or tSavedData.nSavedVersion ~= knSaveVersion then
-		return
-	end
-	
-	if tSavedData.tWindowLocation then
-		self.locSavedWindowLoc = WindowLocation.new(tSavedData.tWindowLocation)
-		
-		if self.wndMain then
-			self.wndMain:MoveToLocation(self.locSavedWindowLoc)
-		end
-	end
-end
-
 function ImprovedSalvage:OnLoad()
 	self.xmlDoc = XmlDoc.CreateFromFile("ImprovedSalvage.xml")
 	self.xmlDoc:RegisterCallback("OnDocumentReady", self) 
 end
 
 function ImprovedSalvage:OnDocumentReady()
-	if  self.xmlDoc == nil then
+	if self.xmlDoc == nil then
 		return
 	end
+	
+	Apollo.RegisterEventHandler("WindowManagementReady", 	"OnWindowManagementReady", self)
+	
 	Apollo.RegisterEventHandler("RequestSalvageAll", "OnSalvageAll", self) -- using this for bag changes
 	Apollo.RegisterSlashCommand("salvageall", "OnSalvageAll", self)
 
@@ -71,6 +44,10 @@ function ImprovedSalvage:OnDocumentReady()
 	self.nItemIndex = nil
 
 	self.wndMain:Show(false, true)
+end
+
+function ImprovedSalvage:OnWindowManagementReady()
+	Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = Apollo.GetString("CRB_Salvage")})
 end
 
 --------------------//-----------------------------
@@ -104,7 +81,9 @@ function ImprovedSalvage:RedrawAll()
 end
 
 function ImprovedSalvage:HelperBuildResultDisplay(wndOwner, wndParent, itemCurr, itemModData )
+	--local nVScrollPos = self.wndMain:FindChild("MainScroll"):GetVScrollPos()
 	wndParent:DestroyChildren()
+	
 	local tResult = Tooltip.GetItemTooltipForm(wndOwner, wndParent, itemCurr, { bPermanent = true, wndParent = wndParent, bNotEquipped = true, bPrimary = true })
 	local wndTooltip = nil
 	if tResult ~= nil then
@@ -113,13 +92,16 @@ function ImprovedSalvage:HelperBuildResultDisplay(wndOwner, wndParent, itemCurr,
 		elseif type(tResult) == 'userdata' then
 			wndTooltip = tResult
 		end
-	end
+	end 
 	if wndTooltip ~= nil then
-		local nWidth = wndTooltip:GetWidth()
-		local nHeight = wndTooltip:GetHeight()
 		local nLeft, nTop, nRight, nBottom = wndParent:GetAnchorOffsets()
-		wndParent:SetAnchorOffsets(nLeft, nTop, nRight + nWidth, nTop + nHeight)
+		wndParent:SetAnchorOffsets(nLeft, nTop, nRight, nTop + wndTooltip:GetHeight())
+		self.wndMain:FindChild("MainScroll"):SetVScrollPos(0)
+		self.wndMain:FindChild("MainScroll"):RecalculateContentExtents()
 	end
+	
+	--self.wndMain:FindChild("MainScroll"):SetVScrollPos(nVScrollPos)
+	--self.wndMain:FindChild("MainScroll"):RecalculateContentExtents()
 end
 
 
