@@ -13,7 +13,7 @@ require "Sound"
 -----------------------------------------------------------------------------------------------
 -- Constants and Defaults parameters
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "SpaceStashInventory-Beta", 13
+local MAJOR, MINOR = "SpaceStashInventory-Beta", 14
 
 local CodeEnumTabDisplay = {
 	None = 0,
@@ -141,7 +141,6 @@ function SpaceStashInventory:OnEnable()
       pattern = "%d [%c:%n] %l - %m",
       appender = "Print"
     })
-
 end
 
 
@@ -174,24 +173,23 @@ end
 
 function SpaceStashInventory:OnSpaceStashInventoryReady()
   
-  Apollo.RegisterEventHandler("ShowInventory", "InventoryBagOpenCallback", self)
-  Apollo.RegisterEventHandler("ToggleInventory", "InventoryBagOpenCallback", self)
-  Apollo.RegisterTimerHandler("InventoryBag_DelayTimer", "DelayTimer", self)
-  Apollo.CreateTimer("InventoryBag_DelayTimer", 0.01, false)
-
   Apollo.RegisterSlashCommand("ssi", "OnSSCmd", self)
   Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
   
   Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
   Apollo.RegisterEventHandler("WindowMove", "OnWindowMove", self)
   Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "Redraw", self)
-  Apollo.RegisterEventHandler("LootedItem", 'OnItemLoot', self)
 
   Apollo.RegisterEventHandler("GuildBank_ShowPersonalInventory", "OnVisibilityToggle", self)
   Apollo.RegisterEventHandler("InterfaceMenu_ToggleInventory", "OnVisibilityToggle", self)
   
   Apollo.RegisterEventHandler("ToggleInventory", "OnVisibilityToggle", self)
   Apollo.RegisterEventHandler("ShowInventory", "OnVisibilityToggle", self)
+
+  Apollo.RegisterEventHandler("LootedItem","OnItemLoot", self)
+  Apollo.RegisterEventHandler("ItemAdded","OnItemLoot", self)
+  Apollo.RegisterEventHandler("CombatLogLoot","OnItemLoot", self)
+  Apollo.RegisterEventHandler("GenericEvent_LootChannelMessage","OnItemLoot", self)
 
   Apollo.RegisterEventHandler("DragDropSysBegin", "OnSystemBeginDragDrop", self)
   Apollo.RegisterEventHandler("DragDropSysEnd", "OnSystemEndDragDrop", self)
@@ -209,7 +207,7 @@ function SpaceStashInventory:OnSpaceStashInventoryReady()
   elseif self.tConfig.SelectedTab == CodeEnumTabDisplay.VirtualItemsTab then
     self.wndTopFrame:FindChild("ShowBagsTabButton"):SetCheck(false)
     self.wndBagsTabFrame:Show(false)
-    self.wndTopFrame:FindChild("ShowVirtualItemsTabButton"):SetCheck(true)  
+    self.wndTopFrame:FindChild("ShowVirtualItemsTabButton"):SetCheck(true)
     self.wndVirtualItemsTabFrame:Show(true)
     self.wndTopFrame:FindChild("ShowTradeskillsBagTabButton"):SetCheck(false)
     self.wndTradeskillsBagTabFrame:Show(false)
@@ -235,21 +233,6 @@ end
 
 function SpaceStashInventory:OnInterfaceMenuListHasLoaded()
 	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", Apollo.GetString("InterfaceMenu_Inventory"), {"InterfaceMenu_ToggleInventory", "Inventory", ""})
-end
-
------------------------------------------------------------------------------------------------
--- Killing base inventory window in the case of other addon repacking it
------------------------------------------------------------------------------------------------
- 
-function SpaceStashInventory:DelayTimer()
-        Apollo.StartTimer("InventoryBag_DelayTimer")
-end
- 
-function SpaceStashInventory:InventoryBagOpenCallback()
-  local wndInventoryBag = Apollo.FindWindowByName("InventoryBag")
-  if wndInventoryBag then
-    wndInventoryBag:Show(false)
-  end
 end
 
 -----------------------------------------------------------------------------------------------
@@ -562,6 +545,10 @@ function SpaceStashInventory:OnClose()
 	self:OnVisibilityToggle()
 end
 
+function SpaceStashInventory:OnItemLoot()
+  self.BagWindow:MarkAllItemsAsSeen()
+end
+
 function SpaceStashInventory:OnVisibilityToggle()
 	if self.wndMain:IsShown() then
 		self.wndMain:Show(false,true)
@@ -582,12 +569,6 @@ function SpaceStashInventory:OpenInventory()
 		self.wndMain:Show(true,true)
 		Sound.Play(Sound.PlayUIBagOpen)
 	end
-end
-
-function SpaceStashInventory:OnItemLoot()
-	if self.wndMain:IsShown() then
-    self.wndMain:FindChild("BagWindow"):MarkAllItemsAsSeen()
-  end
 end
 
 -- Update the window sizing an properties (not the 'volatiles' as currencies amounts, new item icon, etc.)

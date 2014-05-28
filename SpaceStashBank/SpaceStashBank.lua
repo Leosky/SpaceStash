@@ -151,6 +151,7 @@ function SpaceStashBank:OnSpaceStashBankReady()
         v:FindChild("BuyBankSlotButton"):Destroy()
       elseif k == nBankBagSlots +1 then
         v:Show(true)
+        v:FindChild("BuyBankSlotButton"):SetTooltip(L["BUYBANKBAGSLOT"])
       end
     end
   end
