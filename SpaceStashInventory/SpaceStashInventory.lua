@@ -13,7 +13,7 @@ require "Sound"
 -----------------------------------------------------------------------------------------------
 -- Constants and Defaults parameters
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "SpaceStashInventory-Beta", 14
+local MAJOR, MINOR = "SpaceStashInventory-Beta", 15
 
 local CodeEnumTabDisplay = {
 	None = 0,
@@ -546,7 +546,7 @@ function SpaceStashInventory:OnClose()
 end
 
 function SpaceStashInventory:OnItemLoot()
-  self.BagWindow:MarkAllItemsAsSeen()
+  self.wndBagWindow:MarkAllItemsAsSeen()
 end
 
 function SpaceStashInventory:OnVisibilityToggle()

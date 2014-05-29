@@ -1,7 +1,7 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashCore-Beta", 64 
+local MAJOR, MINOR = "SpaceStashCore-Beta", 5
 
 
 -- local CodeEnumItemFilter = {
@@ -773,9 +773,6 @@ function SpaceStashCore:OnShowCraftingStation()
 
   SpaceStashInventory:OpenInventory()
 end
-
-
-
 
 function ItemFilterProperty_Salvagable(item)
   if item:CanSalvage() then return true else return false end
