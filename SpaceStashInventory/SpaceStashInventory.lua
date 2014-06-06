@@ -13,55 +13,60 @@ require "Sound"
 -----------------------------------------------------------------------------------------------
 -- Constants and Defaults parameters
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "SpaceStashInventory-Beta", 15
-
-local CodeEnumTabDisplay = {
-	None = 0,
- 	BagsTab = 1, 
-	VirtualItemsTab = 2, 
-	TradeskillsBagTab = 3
-}
-
-local tItemSlotBGPixie = {loc = {fPoints = {0,0,1,10},nOffsets = {0,0,0,0},},strSprite="WhiteFill", cr= "black",fRotation="0"}
-
-local tDefaults = {}
-tDefaults.tConfig = {}
-tDefaults.tConfig.version = {}
-tDefaults.tConfig.version.MAJOR = MAJOR
-tDefaults.tConfig.version.MINOR = MINOR
-tDefaults.tConfig.IconSize = 36
-tDefaults.tConfig.RowSize = 10
-tDefaults.tConfig.location = {}
-tDefaults.tConfig.location.x = 64
-tDefaults.tConfig.location.y = 64
-tDefaults.tConfig.currencies = {eCurrencyType = Money.CodeEnumCurrencyType.Renown}
-tDefaults.tConfig.SelectedTab = CodeEnumTabDisplay.BagsTab
+local MAJOR, MINOR = "SpaceStashInventory-Beta", 17
 
 -----------------------------------------------------------------------------------------------
 -- Libraries
 -----------------------------------------------------------------------------------------------
-local SpaceStashInventory, GeminiLocale, GeminiLogging, inspect, LibError, glog = Apollo.GetPackage("Gemini:Addon-1.0").tPackage:NewAddon(tDefaults,"SpaceStashInventory", false, {}), Apollo.GetPackage("Gemini:Locale-1.0").tPackage
+local GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
+local SpaceStashInventory, glog = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("SpaceStashInventory")
 local L = GeminiLocale:GetLocale("SpaceStashInventory", true)
 
 local SpaceStashCore
+
+local tItemSlotBGPixie = {loc = {fPoints = {0,0,1,10},nOffsets = {0,0,0,0},},strSprite="WhiteFill", cr= "black",fRotation="0"}
+
+SpaceStashInventory.CodeEnumTabDisplay = {
+  None = 0,
+  BagsTab = 1, 
+  VirtualItemsTab = 2, 
+  TradeskillsBagTab = 3
+}
+
+local defaults = {}
+defaults.profile = {}
+defaults.profile.config = {}
+defaults.profile.version = {}
+defaults.profile.version.MAJOR = MAJOR
+defaults.profile.version.MINOR = MINOR
+defaults.profile.config.IconSize = 36
+defaults.profile.config.RowSize = 10
+defaults.profile.config.location = {}
+defaults.profile.config.location.x = 64
+defaults.profile.config.location.y = 64
+defaults.profile.config.currencies = {eCurrencyType = Money.CodeEnumCurrencyType.Renown}
+defaults.profile.config.SelectedTab = SpaceStashInventory.CodeEnumTabDisplay.BagsTab
+
+
 -----------------------------------------------------------------------------------------------
 -- Base Wildstar addon behaviours
 -----------------------------------------------------------------------------------------------
 function SpaceStashInventory:OnInitialize()
-  Apollo.CreateTimer("SSILoadingTimer", 5.0, false)
-  Apollo.RegisterTimerHandler("SSILoadingTimer", "OnLoadingTimer", self)
-  
+
+  self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
+
 	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashInventory.xml")
 	self.xmlDoc:RegisterCallback("OnDocumentReady", self)
 
-  self.bWindowCreated = false
-  self.bReady = false
-  self.bSavedDataRestored = false
-
-  GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
-  inspect = Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
+  glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
+      level = "INFO",
+      pattern = "%d [%c:%n] %l - %m",
+      appender = "Print"
+    })
 
 end
+
+local bDocumentCreated = false
 
 function SpaceStashInventory:OnDocumentReady()
   self.wndMain = Apollo.LoadForm(self.xmlDoc, "SpaceStashInventoryForm", nil, self)
@@ -119,99 +124,24 @@ function SpaceStashInventory:OnDocumentReady()
   self.wndPlayerMenuFrame = self.wndMain:FindChild("PlayerMenuFrame")
 
   self.xmlDoc = nil
-  self.bWindowCreated = true
-
-  if self.bSavedDataRestored then 
-    self:OnSpaceStashInventoryReady()
-  end
-end
-
-function SpaceStashInventory:OnLoadingTimer()
-  Apollo.StopTimer("SSILoadingTimer")
-  if self.bSavedDataRestored == false and self.bWindowCreated == true then
-    glog:info("SpaceStashInventory no data to restore.")
-    self:OnSpaceStashInventoryReady()
-  end
-end
-
-function SpaceStashInventory:OnEnable()
-  SpaceStashCore = Apollo.GetAddon("SpaceStashCore")
-  glog = GeminiLogging:GetLogger({
-      level = GeminiLogging.INFO,
-      pattern = "%d [%c:%n] %l - %m",
-      appender = "Print"
-    })
-end
-
-
--- Replaces MyAddon:OnSave
-function SpaceStashInventory:OnSaveSettings(eLevel)
-  if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then 
-    return
-  end
-
-  return self.tConfig
-end
-
-function SpaceStashInventory:OnRestoreSettings(eLevel, tSavedData)
-  if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then 
-    return
-  elseif tSavedData == nil or tSavedData.version == nil or tSavedData.version.MAJOR ~= MAJOR then --change to corrupted save in general?
-
-  elseif tSavedData.version.MINOR < MINOR then
-
-  else
-    self.tConfig = tSavedData
-  end
-
-  self.bSavedDataRestored = true
-
-  if self.bWindowCreated then
-    self:OnSpaceStashInventoryReady()
-  end
-end
-
-function SpaceStashInventory:OnSpaceStashInventoryReady()
   
-  Apollo.RegisterSlashCommand("ssi", "OnSSCmd", self)
-  Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
-  
-  Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
-  Apollo.RegisterEventHandler("WindowMove", "OnWindowMove", self)
-  Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "Redraw", self)
+  SpaceStashInventory:SetSortMehtod(self.db.profile.config.sort)
 
-  Apollo.RegisterEventHandler("GuildBank_ShowPersonalInventory", "OnVisibilityToggle", self)
-  Apollo.RegisterEventHandler("InterfaceMenu_ToggleInventory", "OnVisibilityToggle", self)
-  
-  Apollo.RegisterEventHandler("ToggleInventory", "OnVisibilityToggle", self)
-  Apollo.RegisterEventHandler("ShowInventory", "OnVisibilityToggle", self)
-
-  Apollo.RegisterEventHandler("LootedItem","OnItemLoot", self)
-  Apollo.RegisterEventHandler("ItemAdded","OnItemLoot", self)
-  Apollo.RegisterEventHandler("CombatLogLoot","OnItemLoot", self)
-  Apollo.RegisterEventHandler("GenericEvent_LootChannelMessage","OnItemLoot", self)
-
-  Apollo.RegisterEventHandler("DragDropSysBegin", "OnSystemBeginDragDrop", self)
-  Apollo.RegisterEventHandler("DragDropSysEnd", "OnSystemEndDragDrop", self)
-  Apollo.RegisterEventHandler("SplitItemStack", "OnSplitItemStack", self)
-
-  SpaceStashInventory:SetSortMehtod(self.tConfig.sort)
-
-  if self.tConfig.SelectedTab == CodeEnumTabDisplay.BagsTab then
+  if self.db.profile.config.SelectedTab == SpaceStashInventory.CodeEnumTabDisplay.BagsTab then
     self.wndTopFrame:FindChild("ShowBagsTabButton"):SetCheck(true)
     self.wndBagsTabFrame:Show(true)
     self.wndTopFrame:FindChild("ShowVirtualItemsTabButton"):SetCheck(false)
     self.wndVirtualItemsTabFrame:Show(false)
     self.wndTopFrame:FindChild("ShowTradeskillsBagTabButton"):SetCheck(false)
     self.wndTradeskillsBagTabFrame:Show(false)
-  elseif self.tConfig.SelectedTab == CodeEnumTabDisplay.VirtualItemsTab then
+  elseif self.db.profile.config.SelectedTab == SpaceStashInventory.CodeEnumTabDisplay.VirtualItemsTab then
     self.wndTopFrame:FindChild("ShowBagsTabButton"):SetCheck(false)
     self.wndBagsTabFrame:Show(false)
     self.wndTopFrame:FindChild("ShowVirtualItemsTabButton"):SetCheck(true)
     self.wndVirtualItemsTabFrame:Show(true)
     self.wndTopFrame:FindChild("ShowTradeskillsBagTabButton"):SetCheck(false)
     self.wndTradeskillsBagTabFrame:Show(false)
-  elseif self.tConfig.SelectedTab == CodeEnumTabDisplay.TradeskillsBagTab then
+  elseif self.db.profile.config.SelectedTab == SpaceStashInventory.CodeEnumTabDisplay.TradeskillsBagTab then
     self.wndTopFrame:FindChild("ShowBagsTabButton"):SetCheck(false)
     self.wndBagsTabFrame:Show(false)
     self.wndTopFrame:FindChild("ShowVirtualItemsTabButton"):SetCheck(false)
@@ -229,7 +159,40 @@ function SpaceStashInventory:OnSpaceStashInventoryReady()
 
   self:Redraw()
   GeminiLocale:TranslateWindow(L, self.wndMain)
+
+  Apollo.RegisterEventHandler("ToggleInventory", "OnVisibilityToggle", self)
+  Apollo.RegisterEventHandler("ShowInventory", "OnVisibilityToggle", self)
+
+  Apollo.RegisterSlashCommand("ssi", "OnSSCmd", self)
+  Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
+  
+  Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
+  Apollo.RegisterEventHandler("WindowMove", "OnWindowMove", self)
+  Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "Redraw", self)
+
+  Apollo.RegisterEventHandler("GuildBank_ShowPersonalInventory", "OnVisibilityToggle", self)
+  Apollo.RegisterEventHandler("InterfaceMenu_ToggleInventory", "OnVisibilityToggle", self)
+
+
+  Apollo.RegisterEventHandler("LootedItem","OnItemLoot", self)
+  Apollo.RegisterEventHandler("ItemAdded","OnItemLoot", self)
+  Apollo.RegisterEventHandler("CombatLogLoot","OnItemLoot", self)
+  Apollo.RegisterEventHandler("GenericEvent_LootChannelMessage","OnItemLoot", self)
+
+  Apollo.RegisterEventHandler("DragDropSysBegin", "OnSystemBeginDragDrop", self)
+  Apollo.RegisterEventHandler("DragDropSysEnd", "OnSystemEndDragDrop", self)
+  Apollo.RegisterEventHandler("SplitItemStack", "OnSplitItemStack", self)
+
+  bDocumentCreated = true
 end
+
+
+function SpaceStashInventory:OnEnable()
+  SpaceStashCore = Apollo.GetAddon("SpaceStashCore")
+
+  if bDocumentCreated then self:Redraw() end
+end
+
 
 function SpaceStashInventory:OnInterfaceMenuListHasLoaded()
 	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", Apollo.GetString("InterfaceMenu_Inventory"), {"InterfaceMenu_ToggleInventory", "Inventory", ""})
@@ -338,11 +301,11 @@ function SpaceStashInventory:UpdateCashAmount()
 		GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.CraftingVouchers):GetAmount() ))
 
 	self.wndCash:SetAmount(GameLib.GetPlayerCurrency(), true)
-	self.wndCurrency:SetAmount(GameLib.GetPlayerCurrency(self.tConfig.currencies.eCurrencyType):GetAmount())
+	self.wndCurrency:SetAmount(GameLib.GetPlayerCurrency(self.db.profile.config.currencies.eCurrencyType):GetAmount())
 end
 
 function SpaceStashInventory:ResetConfig() 
-	self.tConfig = tDefaults
+	self.db.profile.config = defaults
 	
 	self:OnPlayerButtonUncheck() --to be sure that the option window is corresponding
 end
@@ -372,7 +335,7 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 				]]
 			)
 	elseif strParam == "info" then 
-		glog:info(self.tConfig)
+		glog:info(self.db.profile.config)
 	elseif strParam == "redraw" then
 		self:Redraw()
 	elseif string.find(string.lower(strParam), "option") ~= nil then
@@ -385,7 +348,7 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 
 			local eType = tCurrencies[args[3]]
 			if eType ~= nil then
-				self.tConfig.currencies.eCurrencyType = eType
+				self.db.profile.config.currencies.eCurrencyType = eType
 				self.wndCurrency:SetMoneySystem(eType)
 				self:UpdateCashAmount()
 				self:OnPlayerButtonUncheck()
@@ -412,19 +375,19 @@ function SpaceStashInventory:OnSSCmd(strCommand, strParam)
 			end
 		elseif string.lower(args[2]) == "autoselljunks" then
 			if args[3] == string.lower("true") then
-				self.tConfig.auto.SellJunks = true
+				self.db.profile.config.auto.SellJunks = true
 				self:OnPlayerButtonUncheck()
 			elseif args[3] == string.lower("false") then
-				self.tConfig.auto.SellJunks = false
+				self.db.profile.config.auto.SellJunks = false
 				self:OnPlayerButtonUncheck()
 				self.buttonPlayerButton:SetCheck(false)
 			end
 		elseif string.lower(args[2]) == "autorepair" then
 			if args[3] == string.lower("true") then
-				self.tConfig.auto.Repair = true
+				self.db.profile.config.auto.Repair = true
 				self:OnPlayerButtonUncheck()
 			elseif args[3] == string.lower("false") then
-				self.tConfig.auto.Repair = false
+				self.db.profile.config.auto.Repair = false
 				self:OnPlayerButtonUncheck()
 				self.buttonPlayerButton:SetCheck(false)
 			end
@@ -439,7 +402,7 @@ function  SpaceStashInventory:OnWindowMove()
 	-- TODO: Check that the window is in the screen
 	-- TODO: add an option to keep the entire frame in screen
 
-	self.tConfig.location.x, self.tConfig.location.y = self.wndMain:GetPos()
+	self.db.profile.config.location.x, self.db.profile.config.location.y = self.wndMain:GetPos()
 end
 
 
@@ -459,34 +422,34 @@ function SpaceStashInventory:OnTradskillStashButton()
 end
 
 function SpaceStashInventory:RowSizeChange(nNewValue)
-	nNewValue = nNewValue or self.tConfig.RowSize
-	self.tConfig.RowSize = nNewValue
-	self.wndMain:FindChild("BagWindow"):SetBoxesPerRow(self.tConfig.RowSize)
+	nNewValue = nNewValue or self.db.profile.config.RowSize
+	self.db.profile.config.RowSize = nNewValue
+	self.wndMain:FindChild("BagWindow"):SetBoxesPerRow(self.db.profile.config.RowSize)
 
-	self.rowCount = math.floor(self.wndBagWindow:GetBagCapacity() / self.tConfig.RowSize)
-	if self.wndBagWindow:GetBagCapacity() % self.tConfig.RowSize ~= 0 then self.rowCount = self.rowCount +1 end
+	self.rowCount = math.floor(self.wndBagWindow:GetBagCapacity() / self.db.profile.config.RowSize)
+	if self.wndBagWindow:GetBagCapacity() % self.db.profile.config.RowSize ~= 0 then self.rowCount = self.rowCount +1 end
 
 end
 
 function SpaceStashInventory:IconSizeChange(nNewValue)
-	nNewValue = nNewValue or self.tConfig.IconSize
-	self.tConfig.IconSize = nNewValue
-	self.wndMain:FindChild("BagWindow"):SetSquareSize(self.tConfig.IconSize, self.tConfig.IconSize) 
-	self.wndMain:FindChild("BagWindow"):SetBoxesPerRow(self.tConfig.RowSize) --necessary
+	nNewValue = nNewValue or self.db.profile.config.IconSize
+	self.db.profile.config.IconSize = nNewValue
+	self.wndMain:FindChild("BagWindow"):SetSquareSize(self.db.profile.config.IconSize, self.db.profile.config.IconSize) 
+	self.wndMain:FindChild("BagWindow"):SetBoxesPerRow(self.db.profile.config.RowSize) --necessary
 
-	self.wndBagsTabFrame:SetAnchorOffsets(1,self.wndMenuFrame:GetHeight(),0,self.wndMenuFrame:GetHeight() + self.tConfig.IconSize )
-	self.wndTopFrame:SetAnchorOffsets(0,0,0,self.wndMenuFrame:GetHeight() + self.tConfig.IconSize )
-	self.ItemWidget1:SetAnchorOffsets(0,0,self.tConfig.IconSize,self.tConfig.IconSize)
-	self.ItemWidget2:SetAnchorOffsets(0,0,self.tConfig.IconSize,self.tConfig.IconSize)
-	self.ItemWidget3:SetAnchorOffsets(0,0,self.tConfig.IconSize,self.tConfig.IconSize)
-	self.ItemWidget4:SetAnchorOffsets(0,0,self.tConfig.IconSize,self.tConfig.IconSize)
+	self.wndBagsTabFrame:SetAnchorOffsets(1,self.wndMenuFrame:GetHeight(),0,self.wndMenuFrame:GetHeight() + self.db.profile.config.IconSize )
+	self.wndTopFrame:SetAnchorOffsets(0,0,0,self.wndMenuFrame:GetHeight() + self.db.profile.config.IconSize )
+	self.ItemWidget1:SetAnchorOffsets(0,0,self.db.profile.config.IconSize,self.db.profile.config.IconSize)
+	self.ItemWidget2:SetAnchorOffsets(0,0,self.db.profile.config.IconSize,self.db.profile.config.IconSize)
+	self.ItemWidget3:SetAnchorOffsets(0,0,self.db.profile.config.IconSize,self.db.profile.config.IconSize)
+	self.ItemWidget4:SetAnchorOffsets(0,0,self.db.profile.config.IconSize,self.db.profile.config.IconSize)
 	self.wndBagsTabFrame:ArrangeChildrenHorz(0)
 
-	if self.tConfig.SelectedTab == CodeEnumTabDisplay.BagsTab then
+	if self.db.profile.config.SelectedTab == SpaceStashInventory.CodeEnumTabDisplay.BagsTab then
 		self.topFrameHeight = self.wndMenuFrame:GetHeight() + self.wndBagsTabFrame:GetHeight()
-	elseif self.tConfig.SelectedTab == CodeEnumTabDisplay.VirtualItemsTab then
+	elseif self.db.profile.config.SelectedTab == SpaceStashInventory.CodeEnumTabDisplay.VirtualItemsTab then
 		self.topFrameHeight = self.wndMenuFrame:GetHeight() + self.wndVirtualItemsTabFrame:GetHeight()
-	elseif self.tConfig.SelectedTab == CodeEnumTabDisplay.TradeskillsBagTab then
+	elseif self.db.profile.config.SelectedTab == SpaceStashInventory.CodeEnumTabDisplay.TradeskillsBagTab then
 		self.topFrameHeight = self.wndMenuFrame:GetHeight() + self.wndTradeskillsBagTabFrame:GetHeight()
 	else
 		self.topFrameHeight = self.wndMenuFrame:GetHeight()
@@ -529,20 +492,21 @@ function SpaceStashInventory:OnInventoryDisplayChange()
 		self.BagArtWindow4:FindChild("Capacity"):SetText()
 	end
 
-	local nInventoryFrameHeight = self.rowCount * self.tConfig.IconSize
-	local nInventoryFrameWidth = self.tConfig.IconSize * self.tConfig.RowSize
+	local nInventoryFrameHeight = self.rowCount * self.db.profile.config.IconSize
+	local nInventoryFrameWidth = self.db.profile.config.IconSize * self.db.profile.config.RowSize
 
 	self.wndMain:SetAnchorOffsets(
-		self.tConfig.location.x,
-		self.tConfig.location.y,
-		self.tConfig.location.x + nInventoryFrameWidth - self.leftOffset + self.rightOffset,
-		self.tConfig.location.y + self.topFrameHeight + self.bottomFrameHeight + nInventoryFrameHeight - self.topOffset + self.bottomOffset + 4)
+		self.db.profile.config.location.x,
+		self.db.profile.config.location.y,
+		self.db.profile.config.location.x + nInventoryFrameWidth - self.leftOffset + self.rightOffset,
+		self.db.profile.config.location.y + self.topFrameHeight + self.bottomFrameHeight + nInventoryFrameHeight - self.topOffset + self.bottomOffset + 4)
 	
 end
 
 -- when the Cancel button is clicked
 function SpaceStashInventory:OnClose()
-	self:OnVisibilityToggle()
+  self.wndMain:Show(false,true)
+  Sound.Play(Sound.PlayUIBagClose)
 end
 
 function SpaceStashInventory:OnItemLoot()
@@ -580,7 +544,7 @@ function SpaceStashInventory:Redraw()
 	self:RowSizeChange()
 	self:OnInventoryDisplayChange()
 
-	self.wndMain:FindChild("CurrencyWindow"):SetMoneySystem(self.tConfig.currencies.eCurrencyType)
+	self.wndMain:FindChild("CurrencyWindow"):SetMoneySystem(self.db.profile.config.currencies.eCurrencyType)
 	self:UpdateCashAmount()
 end
 
@@ -606,10 +570,10 @@ function SpaceStashInventory:OnGenerateBagTooltip( wndControl, wndHandler, tType
 end
 
 function SpaceStashInventory:OnShowBagsTab()
-	if self.tConfig.SelectedTab == CodeEnumTabDisplay.BagsTab then
+	if self.db.profile.config.SelectedTab == SpaceStashInventory.CodeEnumTabDisplay.BagsTab then
 		self:OnTabUnshow()
 	else
-		self.tConfig.SelectedTab = CodeEnumTabDisplay.BagsTab
+		self.db.profile.config.SelectedTab = SpaceStashInventory.CodeEnumTabDisplay.BagsTab
 		self.wndTopFrame:FindChild("ShowBagsTabButton"):SetCheck(true)
 		self.wndBagsTabFrame:Show(true)
 		self.wndTopFrame:FindChild("ShowVirtualItemsTabButton"):SetCheck(false)
@@ -622,10 +586,10 @@ end
 
 
 function SpaceStashInventory:OnShowVirtualItemsTab(wndHandler, wndControl, eMouseButton )
-	if self.tConfig.SelectedTab == CodeEnumTabDisplay.VirtualItemsTab then
+	if self.db.profile.config.SelectedTab == SpaceStashInventory.CodeEnumTabDisplay.VirtualItemsTab then
 		self:OnTabUnshow()
 	else
-		self.tConfig.SelectedTab = CodeEnumTabDisplay.VirtualItemsTab
+		self.db.profile.config.SelectedTab = SpaceStashInventory.CodeEnumTabDisplay.VirtualItemsTab
 		self.wndTopFrame:FindChild("ShowBagsTabButton"):SetCheck(false)
 		self.wndBagsTabFrame:Show(false)
 		self.wndTopFrame:FindChild("ShowVirtualItemsTabButton"):SetCheck(true)
@@ -637,10 +601,10 @@ function SpaceStashInventory:OnShowVirtualItemsTab(wndHandler, wndControl, eMous
 end
 
 function SpaceStashInventory:OnShowTradeskillsBagTab(wndHandler, wndControl, eMouseButton )
-	if self.tConfig.SelectedTab == CodeEnumTabDisplay.TradeskillsBagTab then
+	if self.db.profile.config.SelectedTab == SpaceStashInventory.CodeEnumTabDisplay.TradeskillsBagTab then
 		self:OnTabUnshow()
 	else
-		self.tConfig.SelectedTab = CodeEnumTabDisplay.TradeskillsBagTab
+		self.db.profile.config.SelectedTab = SpaceStashInventory.CodeEnumTabDisplay.TradeskillsBagTab
 		self.wndTopFrame:FindChild("ShowBagsTabButton"):SetCheck(false)
 		self.wndBagsTabFrame:Show(false)
 		self.wndTopFrame:FindChild("ShowVirtualItemsTabButton"):SetCheck(false)
@@ -653,7 +617,7 @@ end
 
 function SpaceStashInventory:OnTabUnshow(wndHandler, wndControl, eMouseButton )
 
-	self.tConfig.SelectedTab = CodeEnumTabDisplay.None
+	self.db.profile.config.SelectedTab = SpaceStashInventory.CodeEnumTabDisplay.None
 
 	self.wndTopFrame:FindChild("ShowBagsTabButton"):SetCheck(false)
 	self.wndBagsTabFrame:Show(false)
@@ -678,23 +642,23 @@ end
 -- SpaceStashInventory Setters / Getters
 -----------------------------------------------------------------------------------------------
 function SpaceStashInventory:SetTrackedCurrency(eLevel)
-	self.tConfig.currencies.eCurrencyType = eLevel
-	self.wndCurrency:SetMoneySystem(self.tConfig.currencies.eCurrencyType )
+	self.db.profile.config.currencies.eCurrencyType = eLevel
+	self.wndCurrency:SetMoneySystem(self.db.profile.config.currencies.eCurrencyType )
 	self:UpdateCashAmount()
   SpaceStashCore:UpdateTrackedCurrency()
-  if self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.ElderGems then
+  if self.db.profile.config.currencies.eCurrencyType == Money.CodeEnumCurrencyType.ElderGems then
     self.SSIElderGemsButton:SetCheck(true)
-  elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Prestige then
+  elseif self.db.profile.config.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Prestige then
     self.SSIPrestigeButton:SetCheck(true)
-  elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Renown then
+  elseif self.db.profile.config.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Renown then
     self.SSIRenownButton:SetCheck(true)
-  elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.CraftingVouchers then
+  elseif self.db.profile.config.currencies.eCurrencyType == Money.CodeEnumCurrencyType.CraftingVouchers then
     self.SSICraftingVouchersButton:SetCheck(true)
   end
 end
 
 function SpaceStashInventory:GetTrackedCurrency()
-	return self.tConfig.currencies.eCurrencyType
+	return self.db.profile.config.currencies.eCurrencyType
 end
 
 function SpaceStashInventory:SetIconsSize(nSize)
@@ -703,7 +667,7 @@ function SpaceStashInventory:SetIconsSize(nSize)
 end
 
 function SpaceStashInventory:GetIconsSize()
-	return self.tConfig.IconSize
+	return self.db.profile.config.IconSize
 end
 
 function SpaceStashInventory:SetRowsSize(nSize)
@@ -712,7 +676,7 @@ function SpaceStashInventory:SetRowsSize(nSize)
 end
 
 function SpaceStashInventory:GetRowsSize()
-	return self.tConfig.RowSize
+	return self.db.profile.config.RowSize
 end
 
 function SpaceStashInventory:OnShowBank()
@@ -721,13 +685,13 @@ end
 
 function SpaceStashInventory:OnCurrenciesRightClick(wndHandler, wndControl, eMouseButton)
 	if eMouseButton == 1 then
-    if self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.ElderGems then
+    if self.db.profile.config.currencies.eCurrencyType == Money.CodeEnumCurrencyType.ElderGems then
       self.SSIElderGemsButton:SetCheck(true)
-    elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Prestige then
+    elseif self.db.profile.config.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Prestige then
       self.SSIPrestigeButton:SetCheck(true)
-    elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Renown then
+    elseif self.db.profile.config.currencies.eCurrencyType == Money.CodeEnumCurrencyType.Renown then
       self.SSIRenownButton:SetCheck(true)
-    elseif self.tConfig.currencies.eCurrencyType == Money.CodeEnumCurrencyType.CraftingVouchers then
+    elseif self.db.profile.config.currencies.eCurrencyType == Money.CodeEnumCurrencyType.CraftingVouchers then
       self.SSICraftingVouchersButton:SetCheck(true)
     end
 		self.wndCurrenciesMicroMenu:Show(true,true)
@@ -751,7 +715,7 @@ function SpaceStashInventory:OnCloseCurrenciesMicroMenu()
 end
 
 function SpaceStashInventory:SetSortMehtod(nSortMethod)
-  self.tConfig.sort = nSortMethod
+  self.db.profile.config.sort = nSortMethod
 
   if nSortMethod == 1 then
     self.wndBagWindow:SetSort(true)

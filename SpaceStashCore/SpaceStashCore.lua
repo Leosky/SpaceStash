@@ -1,64 +1,16 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashCore-Beta", 5
-
-
--- local CodeEnumItemFilter = {
--- 	ItemFilter_Salvagable = 0,
--- 	ItemFilter_Consumable = 1,
--- 	ItemFilter_Crafting = 2,
--- 	ItemFilter_Housing = 3,
--- 	ItemFilter_AMP = 4,
--- 	ItemFilter_Schematic = 5,
--- 	ItemFilter_Costume = 6,
--- }
-
-
-
-
-
-local tDefaults = {}
-tDefaults.tConfig = {}
-tDefaults.tConfig.version = {}
-tDefaults.tConfig.version.MAJOR = MAJOR
-tDefaults.tConfig.version.MINOR = MINOR
-tDefaults.tConfig.auto = {}
-tDefaults.tConfig.auto.inventory = {}
-tDefaults.tConfig.auto.inventory.vendor = false
-tDefaults.tConfig.auto.inventory.bank = false
-tDefaults.tConfig.auto.inventory.auctionhouse = false
-tDefaults.tConfig.auto.inventory.commoditiesexchange = false
-tDefaults.tConfig.auto.inventory.mailbox = false
-tDefaults.tConfig.auto.inventory.engravingstation = false
-tDefaults.tConfig.auto.inventory.craftingstation = false
-tDefaults.tConfig.auto.inventory.sort = 0
-tDefaults.tConfig.auto.repair = false
-tDefaults.tConfig.auto.sell = {}
-tDefaults.tConfig.auto.sell.whitelist = {}
-tDefaults.tConfig.auto.sell.blacklist = {}
-tDefaults.tConfig.auto.sell.whitelistRaw = ""
-tDefaults.tConfig.auto.sell.blacklistRaw = ""
-tDefaults.tConfig.auto.sell.active = false
-tDefaults.tConfig.auto.sell.filters = {}
-tDefaults.tConfig.auto.sell.filters.Salvagables = { active = false, filter = 1, group = 1}
-tDefaults.tConfig.auto.sell.filters.Consumables = { active = false, filter = 2, group = 2}
-tDefaults.tConfig.auto.sell.filters.Housing = { active = false, filter = 3, group = 2 }
-tDefaults.tConfig.auto.sell.filters.Crafting = { active = false, filter = 4, group = 2 }
-tDefaults.tConfig.auto.sell.filters.AMP = { active = false, filter = 5, group = 2 }
-tDefaults.tConfig.auto.sell.filters.Costumes = { active = false, filter = 6, group = 2 }
-tDefaults.tConfig.auto.sell.filters.Schematics = { active = false, filter = 7, group = 2 }
-
-tDefaults.tConfig.auto.sell.QualityTreshold = 1
+local MAJOR, MINOR = "SpaceStashCore-Beta", 7
 
 -----------------------------------------------------------------------------------------------
 -- Libraries
 -----------------------------------------------------------------------------------------------
-local SpaceStashCore, GeminiLocale, GeminiGUI, GeminiLogging, inspect, glog, LibError = Apollo.GetPackage("Gemini:Addon-1.0").tPackage:NewAddon(tDefaults,"SpaceStashCore", false, {}), Apollo.GetPackage("Gemini:Locale-1.0").tPackage
-local L
+local GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
+local SpaceStashCore, glog, LibError = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("SpaceStashCore","SpaceStash")
+local L = GeminiLocale:GetLocale("SpaceStashCore", true)
 
 local SpaceStashInventory, SpaceStashBank
-
 
 SpaceStashCore.CodeEnumItemFilter = {
 	[1] = "Salvagable",
@@ -70,20 +22,55 @@ SpaceStashCore.CodeEnumItemFilter = {
 	[7] = "Schematic",
 }
 
+local defaults = {}
+defaults.profile = {}
+defaults.profile.config = {}
+defaults.profile.version = {}
+defaults.profile.version.MAJOR = MAJOR
+defaults.profile.version.MINOR = MINOR
+defaults.profile.config.auto = {}
+defaults.profile.config.auto.inventory = {}
+defaults.profile.config.auto.inventory.vendor = false
+defaults.profile.config.auto.inventory.bank = false
+defaults.profile.config.auto.inventory.auctionhouse = false
+defaults.profile.config.auto.inventory.commoditiesexchange = false
+defaults.profile.config.auto.inventory.mailbox = false
+defaults.profile.config.auto.inventory.engravingstation = false
+defaults.profile.config.auto.inventory.craftingstation = false
+defaults.profile.config.auto.inventory.sort = 0
+defaults.profile.config.auto.repair = false
+defaults.profile.config.auto.sell = {}
+defaults.profile.config.auto.sell.whitelist = {}
+defaults.profile.config.auto.sell.blacklist = {}
+defaults.profile.config.auto.sell.whitelistRaw = ""
+defaults.profile.config.auto.sell.blacklistRaw = ""
+defaults.profile.config.auto.sell.active = false
+defaults.profile.config.auto.sell.filters = {}
+defaults.profile.config.auto.sell.filters.Salvagables = { active = false, filter = 1, group = 1}
+defaults.profile.config.auto.sell.filters.Consumables = { active = false, filter = 2, group = 2}
+defaults.profile.config.auto.sell.filters.Housing = { active = false, filter = 3, group = 2 }
+defaults.profile.config.auto.sell.filters.Crafting = { active = false, filter = 4, group = 2 }
+defaults.profile.config.auto.sell.filters.AMP = { active = false, filter = 5, group = 2 }
+defaults.profile.config.auto.sell.filters.Costumes = { active = false, filter = 6, group = 2 }
+defaults.profile.config.auto.sell.filters.Schematics = { active = false, filter = 7, group = 2 }
+
+defaults.profile.config.auto.sell.QualityTreshold = 1
+
+
 -- Replaces MyAddon:OnLoad
 function SpaceStashCore:OnInitialize()
-  Apollo.CreateTimer("SSCLoadingTimer", 5.0, false)
-  Apollo.RegisterTimerHandler("SSCLoadingTimer", "OnLoadingTimer", self)
+
+  self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
+
   self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashCore.xml")
   self.xmlDoc:RegisterCallback("OnDocumentReady", self)
-  self.bWindowCreated = false
-  self.bReady = false
-  self.bSavedDataRestored = false
+
   GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
   inspect = Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
   L = GeminiLocale:GetLocale("SpaceStashCore", true)
   SpaceStashInventory = Apollo.GetAddon("SpaceStashInventory")
   SpaceStashBank = Apollo.GetAddon("SpaceStashBank")
+
   self.filters = {}
  	self.filters.Salvagable = ItemFilterProperty_Salvagable
 	self.filters.Consumable = ItemFilterFamily_Consumable
@@ -92,14 +79,16 @@ function SpaceStashCore:OnInitialize()
 	self.filters.AMP = ItemFilterFamily_AMP
 	self.filters.Costume = ItemFilterFamily_Costume
 	self.filters.Schematic = ItemFilterFamily_Schematic
+
+  glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
+    level = "INFO",
+    pattern = "%d [%c:%n] %l - %m",
+    appender = "Print"
+  })
 end
 
-function SpaceStashCore:OnLoadingTimer()
-  Apollo.StopTimer("SSICoadingTimer")
-  if self.bSavedDataRestored == false and self.bWindowCreated == true then
-    glog:info("SpaceStashCore no data to restore.")
-    self:OnSpaceStashCoreReady()
-  end
+function SpaceStashCore:OnConfigure()
+  Event_FireGenericEvent("SpaceStashCore_OpenOptions", self)
 end
 
 function SpaceStashCore:OnDocumentReady()
@@ -171,173 +160,12 @@ function SpaceStashCore:OnDocumentReady()
     self:UpdateBankRowsSize()
     self:UpdateBankIconsSize()
   end
-
-  self.bWindowCreated = true
-
-  if self.bSavedDataRestored then 
-    self:OnSpaceStashCoreReady()
-  end
+  
+  self:OnSpaceStashCoreReady()
 end
 
 -- Called when player has loaded and entered the world
 function SpaceStashCore:OnEnable()
-  glog = GeminiLogging:GetLogger({
-    level = GeminiLogging.INFO,
-    pattern = "%d [%c:%n] %l - %m",
-    appender = "Print"
-  })
-
-end
-
--- Replaces MyAddon:OnSave
-function SpaceStashCore:OnSaveSettings(eLevel)
-  if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then 
-    return
-  end
-
-  return self.tConfig
-end
-
--- Replaces MyAddon:OnRestore
-function SpaceStashCore:OnRestoreSettings(eLevel, tSavedData)
-  if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then 
-    return
-  elseif tSavedData == nil or tSavedData.version == nil or tSavedData.version.MAJOR ~= MAJOR then --change to corrupted save in general?
-
-  elseif tSavedData.version.MINOR < MINOR then
-
-  else
-    self.tConfig = tSavedData
-  end
-
-  self.bSavedDataRestored = true
-
-  if self.bWindowCreated and self.bReady == false then
-    self:OnSpaceStashCoreReady()
-  elseif self.bReady then
-    self.SSCAutoCS:SetCheck(self.tConfig.auto.inventory.craftingstation)
-    self.SSCAutoSell:SetCheck(self.tConfig.auto.sell.active)
-	self.SSCSellQualityChooserButton = self.SSCOptionsFrame:FindChild("SellQualityChooserButton")
-	self.SSCSellSavagable:SetCheck(self.tConfig.auto.sell.filters.Salvagables.active)
-	self.SSCSellConsumables:SetCheck(self.tConfig.auto.sell.filters.Consumables.active)
-	self.SSCSellAMP:SetCheck(self.tConfig.auto.sell.filters.AMP.active)
-	self.SSCSellHousing:SetCheck(self.tConfig.auto.sell.filters.Housing.active)
-	self.SSCSellCrafting:SetCheck(self.tConfig.auto.sell.filters.Crafting.active)
-	self.SSCSellCostumes:SetCheck(self.tConfig.auto.sell.filters.Costumes.active)
-	self.SSCSellSchematics:SetCheck(self.tConfig.auto.sell.filters.Schematics.active)
-
-    self.SSCAutoRepair:SetCheck(self.tConfig.auto.repair)
-    self.SSCAutoES:SetCheck(self.tConfig.auto.inventory.engravingstation)
-
-    self.SSCAutoMailbox:SetCheck(self.tConfig.auto.inventory.mailbox)
-    self.SSCAutoCE:SetCheck(self.tConfig.auto.inventory.commoditiesexchange)
-    self.SSCAutoAH:SetCheck(self.tConfig.auto.inventory.auctionhouse)
-    self.SSCAutoBank:SetCheck(self.tConfig.auto.inventory.bank)
-    self.SSCAutoVendor:SetCheck(self.tConfig.auto.inventory.vendor)
-
-
-	self.SellWhitelist:SetText(self.tConfig.auto.sell.whitelistRaw)
-	self.SellBlacklist:SetText(self.tConfig.auto.sell.blacklistRaw)
-
-    if self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Inferior then
-      self.SSCSellQualityChooserButton:FindChild("Choice1"):SetCheck(true)
-      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice1"):GetText())
-    elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Average then
-      self.SSCSellQualityChooserButton:FindChild("Choice2"):SetCheck(true)
-      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice2"):GetText())
-    elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Good then
-      self.SSCSellQualityChooserButton:FindChild("Choice3"):SetCheck(true)
-      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice3"):GetText())
-    elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
-      self.SSCSellQualityChooserButton:FindChild("Choice4"):SetCheck(true)
-      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice4"):GetText())
-    elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Superb then
-      self.SSCSellQualityChooserButton:FindChild("Choice5"):SetCheck(true)
-      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice5"):GetText())
-    elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Legendary then
-      self.SSCSellQualityChooserButton:FindChild("Choice6"):SetCheck(true)
-      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice6"):GetText())
-    elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Artifact then
-      self.SSCSellQualityChooserButton:FindChild("Choice7"):SetCheck(true)
-      self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice7"):GetText())
-    end
-
-    if self.tConfig.auto.inventory.sort == 0 then
-      self.SSISortChooserButton:FindChild("Choice1"):SetCheck(true)
-      self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice1"):GetText())
-    elseif self.tConfig.auto.inventory.sort == 1 then
-      self.SSISortChooserButton:FindChild("Choice2"):SetCheck(true)
-      self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice2"):GetText())
-    elseif self.tConfig.auto.inventory.sort == 2 then
-      self.SSISortChooserButton:FindChild("Choice3"):SetCheck(true)
-      self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice3"):GetText())
-    elseif self.tConfig.auto.inventory.sort == 3 then
-      self.SSISortChooserButton:FindChild("Choice4"):SetCheck(true)
-      self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice4"):GetText())
-    end
-  end
-end
-
-function SpaceStashCore:OnSpaceStashCoreReady()
-
-self.SSCAutoCS:SetCheck(self.tConfig.auto.inventory.craftingstation)
-self.SSCAutoSell:SetCheck(self.tConfig.auto.sell.active)
-self.SSCSellSavagable:SetCheck(self.tConfig.auto.sell.filters.Salvagables.active)
-self.SSCSellConsumables:SetCheck(self.tConfig.auto.sell.filters.Consumables.active)
-self.SSCSellAMP:SetCheck(self.tConfig.auto.sell.filters.AMP.active)
-self.SSCSellHousing:SetCheck(self.tConfig.auto.sell.filters.Housing.active)
-self.SSCSellCrafting:SetCheck(self.tConfig.auto.sell.filters.Crafting.active)
-self.SSCSellCostumes:SetCheck(self.tConfig.auto.sell.filters.Costumes.active)
-self.SSCSellSchematics:SetCheck(self.tConfig.auto.sell.filters.Schematics.active)
-self.SSCAutoRepair:SetCheck(self.tConfig.auto.repair)
-self.SSCAutoES:SetCheck(self.tConfig.auto.inventory.engravingstation)
-
-self.SSCAutoMailbox:SetCheck(self.tConfig.auto.inventory.mailbox)
-self.SSCAutoCE:SetCheck(self.tConfig.auto.inventory.commoditiesexchange)
-self.SSCAutoAH:SetCheck(self.tConfig.auto.inventory.auctionhouse)
-self.SSCAutoBank:SetCheck(self.tConfig.auto.inventory.bank)
-self.SSCAutoVendor:SetCheck(self.tConfig.auto.inventory.vendor)
-
-self.SellWhitelist:SetText(self.tConfig.auto.sell.whitelistRaw or "")
-self.SellBlacklist:SetText(self.tConfig.auto.sell.blacklistRaw or "")
-
-if self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Inferior then
-  self.SSCSellQualityChooserButton:FindChild("Choice1"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice1"):GetText())
-elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Average then
-  self.SSCSellQualityChooserButton:FindChild("Choice2"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice2"):GetText())
-elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Good then
-  self.SSCSellQualityChooserButton:FindChild("Choice3"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice3"):GetText())
-elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
-  self.SSCSellQualityChooserButton:FindChild("Choice4"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice4"):GetText())
-elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Superb then
-  self.SSCSellQualityChooserButton:FindChild("Choice5"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice5"):GetText())
-elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Legendary then
-  self.SSCSellQualityChooserButton:FindChild("Choice6"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice6"):GetText())
-elseif self.tConfig.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Artifact then
-  self.SSCSellQualityChooserButton:FindChild("Choice7"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice7"):GetText())
-end
-
-if self.tConfig.auto.inventory.sort == 0 then
-  self.SSISortChooserButton:FindChild("Choice1"):SetCheck(true)
-  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice1"):GetText())
-elseif self.tConfig.auto.inventory.sort == 1 then
-  self.SSISortChooserButton:FindChild("Choice2"):SetCheck(true)
-  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice2"):GetText())
-elseif self.tConfig.auto.inventory.sort == 2 then
-  self.SSISortChooserButton:FindChild("Choice3"):SetCheck(true)
-  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice3"):GetText())
-elseif self.tConfig.auto.inventory.sort == 3 then
-  self.SSISortChooserButton:FindChild("Choice4"):SetCheck(true)
-  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice4"):GetText())
-end
-
   Apollo.RegisterSlashCommand("ssc", "OnSlashCommand", self)
   Apollo.RegisterEventHandler("SpaceStashCore_OpenOptions", "OnOpenOptions", self)
   Apollo.RegisterEventHandler("ShowBank", "OnShowBank", self)
@@ -351,10 +179,70 @@ end
   Apollo.RegisterEventHandler("GenericEvent_OpenToSpecificTechTree",   "OnShowCraftingStation", self)
   Apollo.RegisterEventHandler("GenericEvent_OpenToSearchSchematic",   "OnShowCraftingStation", self)
   Apollo.RegisterEventHandler("AlwaysShowTradeskills",   "OnShowCraftingStation", self)
+end
+
+
+function SpaceStashCore:OnSpaceStashCoreReady()
+
+self.SSCAutoCS:SetCheck(self.db.profile.config.auto.inventory.craftingstation)
+self.SSCAutoSell:SetCheck(self.db.profile.config.auto.sell.active)
+self.SSCSellSavagable:SetCheck(self.db.profile.config.auto.sell.filters.Salvagables.active)
+self.SSCSellConsumables:SetCheck(self.db.profile.config.auto.sell.filters.Consumables.active)
+self.SSCSellAMP:SetCheck(self.db.profile.config.auto.sell.filters.AMP.active)
+self.SSCSellHousing:SetCheck(self.db.profile.config.auto.sell.filters.Housing.active)
+self.SSCSellCrafting:SetCheck(self.db.profile.config.auto.sell.filters.Crafting.active)
+self.SSCSellCostumes:SetCheck(self.db.profile.config.auto.sell.filters.Costumes.active)
+self.SSCSellSchematics:SetCheck(self.db.profile.config.auto.sell.filters.Schematics.active)
+self.SSCAutoRepair:SetCheck(self.db.profile.config.auto.repair)
+self.SSCAutoES:SetCheck(self.db.profile.config.auto.inventory.engravingstation)
+
+self.SSCAutoMailbox:SetCheck(self.db.profile.config.auto.inventory.mailbox)
+self.SSCAutoCE:SetCheck(self.db.profile.config.auto.inventory.commoditiesexchange)
+self.SSCAutoAH:SetCheck(self.db.profile.config.auto.inventory.auctionhouse)
+self.SSCAutoBank:SetCheck(self.db.profile.config.auto.inventory.bank)
+self.SSCAutoVendor:SetCheck(self.db.profile.config.auto.inventory.vendor)
+
+self.SellWhitelist:SetText(self.db.profile.config.auto.sell.whitelistRaw or "")
+self.SellBlacklist:SetText(self.db.profile.config.auto.sell.blacklistRaw or "")
+
+if self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Inferior then
+  self.SSCSellQualityChooserButton:FindChild("Choice1"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice1"):GetText())
+elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Average then
+  self.SSCSellQualityChooserButton:FindChild("Choice2"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice2"):GetText())
+elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Good then
+  self.SSCSellQualityChooserButton:FindChild("Choice3"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice3"):GetText())
+elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
+  self.SSCSellQualityChooserButton:FindChild("Choice4"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice4"):GetText())
+elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Superb then
+  self.SSCSellQualityChooserButton:FindChild("Choice5"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice5"):GetText())
+elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Legendary then
+  self.SSCSellQualityChooserButton:FindChild("Choice6"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice6"):GetText())
+elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Artifact then
+  self.SSCSellQualityChooserButton:FindChild("Choice7"):SetCheck(true)
+  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice7"):GetText())
+end
+
+if self.db.profile.config.auto.inventory.sort == 0 then
+  self.SSISortChooserButton:FindChild("Choice1"):SetCheck(true)
+  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice1"):GetText())
+elseif self.db.profile.config.auto.inventory.sort == 1 then
+  self.SSISortChooserButton:FindChild("Choice2"):SetCheck(true)
+  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice2"):GetText())
+elseif self.db.profile.config.auto.inventory.sort == 2 then
+  self.SSISortChooserButton:FindChild("Choice3"):SetCheck(true)
+  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice3"):GetText())
+elseif self.db.profile.config.auto.inventory.sort == 3 then
+  self.SSISortChooserButton:FindChild("Choice4"):SetCheck(true)
+  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice4"):GetText())
+end
   GeminiLocale:TranslateWindow(L, self.wndMain)
 
-  self.bReady = true
-  self.wndMain:Show(self.bEarlyShowBank,true)
 end
 
 function SpaceStashCore:OnSlashCommand(strCommand, strParam)
@@ -527,67 +415,67 @@ function SpaceStashCore:UpdateBankRowsSize()
 end
 	
 function SpaceStashCore:OnInventoyAtVendorChanged( wndHandler, wndControl )
-  self.tConfig.auto.inventory.vendor = self.SSCAutoVendor:IsChecked()
+  self.db.profile.config.auto.inventory.vendor = self.SSCAutoVendor:IsChecked()
 end
 
 function SpaceStashCore:OnInventoyAtBankChanged( wndHandler, wndControl )
-  self.tConfig.auto.inventory.bank = self.SSCAutoBank:IsChecked()
+  self.db.profile.config.auto.inventory.bank = self.SSCAutoBank:IsChecked()
 end
 
 function SpaceStashCore:OnInventoyAtAHChanged( wndHandler, wndControl )
-  self.tConfig.auto.inventory.auctionhouse = self.SSCAutoAH:IsChecked()
+  self.db.profile.config.auto.inventory.auctionhouse = self.SSCAutoAH:IsChecked()
 end
 
 function SpaceStashCore:OnInventoyAtCEChanged( wndHandler, wndControl )
-  self.tConfig.auto.inventory.commoditiesexchange = self.SSCAutoCE:IsChecked()
+  self.db.profile.config.auto.inventory.commoditiesexchange = self.SSCAutoCE:IsChecked()
 end
 
 function SpaceStashCore:OnInventoyAtMailboxChanged( wndHandler, wndControl )
-  self.tConfig.auto.inventory.mailbox = self.SSCAutoMailbox:IsChecked()
+  self.db.profile.config.auto.inventory.mailbox = self.SSCAutoMailbox:IsChecked()
 end
 
 function SpaceStashCore:OnInventoyAtESChanged( wndHandler, wndControl )
-  self.tConfig.auto.inventory.engravingstation = self.SSCAutoES:IsChecked()
+  self.db.profile.config.auto.inventory.engravingstation = self.SSCAutoES:IsChecked()
 end
 
 function SpaceStashCore:OnInventoyAtCraftingStationChanged( wndHandler, wndControl )
-  self.tConfig.auto.inventory.craftingstation = self.SSCAutoCS:IsChecked()
+  self.db.profile.config.auto.inventory.craftingstation = self.SSCAutoCS:IsChecked()
 end
 
 function SpaceStashCore:OnAutoRepairChange( wndHandler, wndControl )
-  self.tConfig.auto.repair = self.SSCAutoRepair:IsChecked()
+  self.db.profile.config.auto.repair = self.SSCAutoRepair:IsChecked()
 end
 
 function SpaceStashCore:OnAutoSellChange( wndHandler, wndControl )
-  self.tConfig.auto.sell.active = self.SSCAutoSell:IsChecked()
+  self.db.profile.config.auto.sell.active = self.SSCAutoSell:IsChecked()
 end
 
 function SpaceStashCore:OnSellSalvagableChange( wndHandler, wndControl )
-  self.tConfig.auto.sell.filters.Salvagables.active = self.SSCSellSavagable:IsChecked()
+  self.db.profile.config.auto.sell.filters.Salvagables.active = self.SSCSellSavagable:IsChecked()
 end
 
 function SpaceStashCore:OnSellConsumablesChange( wndHandler, wndControl )
-	self.tConfig.auto.sell.filters.Consumables.active = self.SSCSellConsumables:IsChecked()
+	self.db.profile.config.auto.sell.filters.Consumables.active = self.SSCSellConsumables:IsChecked()
 end
 
 function SpaceStashCore:OnSellCostumesChange( wndHandler, wndControl )
-	self.tConfig.auto.sell.filters.Costumes.active = self.SSCSellCostumes:IsChecked()
+	self.db.profile.config.auto.sell.filters.Costumes.active = self.SSCSellCostumes:IsChecked()
 end
 
 function SpaceStashCore:OnSellAMPChange( wndHandler, wndControl )
-	self.tConfig.auto.sell.filters.AMP.active = self.SSCSellAMP:IsChecked()
+	self.db.profile.config.auto.sell.filters.AMP.active = self.SSCSellAMP:IsChecked()
 end
 
 function SpaceStashCore:OnSellHousingChange( wndHandler, wndControl )
-	self.tConfig.auto.sell.filters.Housing.active = self.SSCSellHousing:IsChecked()
+	self.db.profile.config.auto.sell.filters.Housing.active = self.SSCSellHousing:IsChecked()
 end
 
 function SpaceStashCore:OnSellCraftingChange( wndHandler, wndControl )
-	self.tConfig.auto.sell.filters.Crafting.active = self.SSCSellCrafting:IsChecked()
+	self.db.profile.config.auto.sell.filters.Crafting.active = self.SSCSellCrafting:IsChecked()
 end
 
 function SpaceStashCore:OnSellSchematicsChange( wndHandler, wndControl )
-	self.tConfig.auto.sell.filters.Schematics.active = self.SSCSellSchematics:IsChecked()
+	self.db.profile.config.auto.sell.filters.Schematics.active = self.SSCSellSchematics:IsChecked()
 end
 
 function SpaceStashCore:OnInventorySortToggle( wndHandler, wndControl )
@@ -601,13 +489,13 @@ end
 function SpaceStashCore:OnInventorySortSelected(wndHandler, wndControl)
   if wndHandler == wndControl then
     if wndHandler:GetName() == "Choice1" then
-      tDefaults.tConfig.auto.inventory.sort = 0
+      self.db.profile.config.auto.inventory.sort = 0
     elseif wndHandler:GetName() == "Choice2" then
-      tDefaults.tConfig.auto.inventory.sort = 1
+      self.db.profile.config.auto.inventory.sort = 1
     elseif wndHandler:GetName() == "Choice3" then
-      tDefaults.tConfig.auto.inventory.sort = 2
+      self.db.profile.config.auto.inventory.sort = 2
     elseif wndHandler:GetName() == "Choice4" then
-      tDefaults.tConfig.auto.inventory.sort = 3
+      self.db.profile.config.auto.inventory.sort = 3
     end
     
     self.SSISortChooserButton:SetText(wndHandler:GetText())
@@ -615,7 +503,7 @@ function SpaceStashCore:OnInventorySortSelected(wndHandler, wndControl)
   end
   self:OnInventorySortChooserContainerClose()
   if SpaceStashInventory then
-    SpaceStashInventory:SetSortMehtod(tDefaults.tConfig.auto.inventory.sort)
+    SpaceStashInventory:SetSortMehtod(self.db.profile.config.auto.inventory.sort)
   end
 end
 
@@ -630,19 +518,19 @@ end
 function SpaceStashCore:OnAutoSellQualitySelected(wndHandler, wndControl)
   if wndHandler == wndControl then
     if wndHandler:GetName() == "Choice1" then
-      self.tConfig.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Inferior
+      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Inferior
     elseif wndHandler:GetName() == "Choice2" then
-      self.tConfig.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Average
+      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Average
     elseif wndHandler:GetName() == "Choice3" then
-      self.tConfig.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Good
+      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Good
     elseif wndHandler:GetName() == "Choice4" then
-      self.tConfig.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Excellent
+      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Excellent
     elseif wndHandler:GetName() == "Choice5" then
-      self.tConfig.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Superb
+      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Superb
     elseif wndHandler:GetName() == "Choice6" then
-      self.tConfig.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Legendary
+      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Legendary
     elseif wndHandler:GetName() == "Choice7" then
-      self.tConfig.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Artifact
+      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Artifact
     end
     
     self.SSCSellQualityChooserButton:SetText(wndHandler:GetText())
@@ -655,15 +543,15 @@ end
 --- Automation related events
 --------------------------------------------------------------------------------------
 function SpaceStashCore:OnShowVendor() 
-  if self.tConfig.auto.inventory.vendor then 
+  if self.db.profile.config.auto.inventory.vendor then 
     SpaceStashInventory:OpenInventory()
   end
 
-  if self.tConfig.auto.sell.active then
+  if self.db.profile.config.auto.sell.active then
     self:SellItems()
   end
 
-  if self.tConfig.auto.repair then
+  if self.db.profile.config.auto.repair then
     RepairAllItemsVendor()
   end
   
@@ -671,9 +559,9 @@ end
 
 function SpaceStashCore:SellItems()
   for _, item in ipairs(GameLib.GetPlayerUnit():GetInventoryItems()) do
-    if self.stringInArray(item.itemInBag:GetName(),self.tConfig.auto.sell.whitelist) and item.itemInBag:GetSellPrice() then
+    if self.stringInArray(item.itemInBag:GetName(),self.db.profile.config.auto.sell.whitelist) and item.itemInBag:GetSellPrice() then
       SellItemToVendorById(item.itemInBag:GetInventoryId(), item.itemInBag:GetStackCount())
-    elseif (not self.stringInArray(item.itemInBag:GetName(),self.tConfig.auto.sell.blacklist)) and item.itemInBag:GetItemQuality() <= self.tConfig.auto.sell.QualityTreshold and self:FilterItem(item.itemInBag) and item.itemInBag:GetSellPrice() then
+    elseif (not self.stringInArray(item.itemInBag:GetName(),self.db.profile.config.auto.sell.blacklist)) and item.itemInBag:GetItemQuality() <= self.db.profile.config.auto.sell.QualityTreshold and self:FilterItem(item.itemInBag) and item.itemInBag:GetSellPrice() then
     	SellItemToVendorById(item.itemInBag:GetInventoryId(), item.itemInBag:GetStackCount())
     end
   end
@@ -681,32 +569,32 @@ end
 
 function SpaceStashCore.stringInArray(str,array)
 	for k,v in ipairs(array) do
-		if str == v then glog:info(str) return true end
+		if str == v then return true end
 	end
 end
 
 function SpaceStashCore:OnSellWhitelistChange()
 	local lines = {}
 	local str = self.SellWhitelist:GetText()
-	tDefaults.tConfig.auto.sell.whitelistRaw = self.SellWhitelist:GetText()
+	self.db.profile.config.auto.sell.whitelistRaw = self.SellWhitelist:GetText()
 	local function helper(line) table.insert(lines, line) end
 	helper((str:gsub("(.-)\r?\n", helper)))
 
-	self.tConfig.auto.sell.whitelist = lines
+	self.db.profile.config.auto.sell.whitelist = lines
 end
 
 function SpaceStashCore:OnSellBlacklistChange()
 	local lines = {}
 	local str = self.SellBlacklist:GetText()
-	tDefaults.tConfig.auto.sell.blacklistRaw = self.SellBlacklist:GetText()
+	self.db.profile.config.auto.sell.blacklistRaw = self.SellBlacklist:GetText()
 	local function helper(line) table.insert(lines, line) end
 	helper((str:gsub("(.-)\r?\n", helper)))
 
-	self.tConfig.auto.sell.blacklist = lines
+	self.db.profile.config.auto.sell.blacklist = lines
 end
 
 function SpaceStashCore:FilterItem(item)
-	local filterArray = self.tConfig.auto.sell.filters
+	local filterArray = self.db.profile.config.auto.sell.filters
 	local bFamily = false
 	local bNoFamily = true
 	for _, type in pairs(filterArray) do
@@ -726,8 +614,7 @@ function SpaceStashCore:FilterItem(item)
 			
 		end
 	end
-
-	glog:info(item:GetName() .. ":" .. tostring(bFamily or bNoFamily))
+  
 	return bFamily or bNoFamily
 end
 
@@ -739,37 +626,37 @@ end
 ------------------------------------------------------------------------
 
 function SpaceStashCore:OnShowBank() 
-  if not self.tConfig.auto.inventory.bank then return end
+  if not self.db.profile.config.auto.inventory.bank then return end
 
   SpaceStashInventory:OpenInventory()
 end
 
 function SpaceStashCore:OnShowAuctionHouse( wndHandler, wndControl )
-  if not self.tConfig.auto.inventory.auctionhouse then return end
+  if not self.db.profile.config.auto.inventory.auctionhouse then return end
 
   SpaceStashInventory:OpenInventory()
 end
 
 function SpaceStashCore:OnShowCommoditiesExchange( wndHandler, wndControl )
-  if not self.tConfig.auto.inventory.commoditiesexchange then return end
+  if not self.db.profile.config.auto.inventory.commoditiesexchange then return end
 
   SpaceStashInventory:OpenInventory()
 end
 
 function SpaceStashCore:OnShowMailbox( wndHandler, wndControl )
-  if not self.tConfig.auto.inventory.mailbox then return end
+  if not self.db.profile.config.auto.inventory.mailbox then return end
 
   SpaceStashInventory:OpenInventory()
 end
 
 function SpaceStashCore:OnShowEngravingStation()
-  if not self.tConfig.auto.inventory.engravingstation then return end
+  if not self.db.profile.config.auto.inventory.engravingstation then return end
 
   SpaceStashInventory:OpenInventory()
 end
 
 function SpaceStashCore:OnShowCraftingStation()
-  if not self.tConfig.auto.inventory.craftingstation then return end
+  if not self.db.profile.config.auto.inventory.craftingstation then return end
 
   SpaceStashInventory:OpenInventory()
 end

@@ -1,55 +1,57 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashBank-Beta", 5
+local MAJOR, MINOR = "SpaceStashBank-Beta", 8
 
-local CodeEnumTabDisplay = {
-  None = 0,
-  BankBags = 1
-}
 
-local tDefaults = {}
-tDefaults.tConfig = {}
-tDefaults.tConfig.version = {}
-tDefaults.tConfig.version.MAJOR = MAJOR
-tDefaults.tConfig.version.MINOR = MINOR
-tDefaults.tConfig.IconSize = 36
-tDefaults.tConfig.RowSize = 10
-tDefaults.tConfig.location = {}
-tDefaults.tConfig.location.x = 64
-tDefaults.tConfig.location.y = 64
-tDefaults.tConfig.SelectedTab = CodeEnumTabDisplay.None
 
 local tItemSlotBGPixie = {loc = {fPoints = {0,0,1,10},nOffsets = {0,0,0,0},},strSprite="WhiteFill", cr= "black",fRotation="0"}
+
+
+
 
 -----------------------------------------------------------------------------------------------
 -- Libraries
 -----------------------------------------------------------------------------------------------
-local SpaceStashBank, GeminiLocale, GeminiGUI, GeminiLogging, inspect, glog, LibError = Apollo.GetPackage("Gemini:Addon-1.0").tPackage:NewAddon(tDefaults,"SpaceStashBank", false, {}), Apollo.GetPackage("Gemini:Locale-1.0").tPackage
+local GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
+local SpaceStashBank, glog = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("SpaceStashBank")
 local L = GeminiLocale:GetLocale("SpaceStashBank", true)
+
+SpaceStashBank.CodeEnumTabDisplay = {
+  None = 0,
+  BankBags = 1
+}
+
+local defaults = {}
+defaults.profile = {}
+defaults.profile.config = {}
+defaults.profile.version = {}
+defaults.profile.version.MAJOR = MAJOR
+defaults.profile.version.MINOR = MINOR
+defaults.profile.config.IconSize = 36
+defaults.profile.config.RowSize = 10
+defaults.profile.config.location = {}
+defaults.profile.config.location.x = 64
+defaults.profile.config.location.y = 64
+defaults.profile.config.SelectedTab = SpaceStashBank.CodeEnumTabDisplay.None
 
 -- Replaces MyAddon:OnLoad
 function SpaceStashBank:OnInitialize()
-  Apollo.CreateTimer("SSBLoadingTimer", 5.0, false)
-  Apollo.RegisterTimerHandler("SSBLoadingTimer", "OnLoadingTimer", self)
+
+  self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
+
   self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashBank.xml")
   self.xmlDoc:RegisterCallback("OnDocumentReady", self)
-  self.bWindowCreated = false
-  self.bReady = false
-  self.bSavedDataRestored = false
-  GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
-  inspect = Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
-  
+
+  glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
+    level = "INFO",
+    pattern = "%d [%c:%n] %l - %m",
+    appender = "Print"
+  })
+
 end
 
-function SpaceStashBank:OnLoadingTimer()
-  Apollo.StopTimer("SSBLoadingTimer")
-
-  if self.bSavedDataRestored == false and self.bWindowCreated == true then
-  	glog:info("SpaceStashBank no data to restore.")
-    self:OnSpaceStashBankReady()
-  end
-end
+local bDocumentCreated = false
 
 function SpaceStashBank:OnDocumentReady()
   self.wndMain = Apollo.LoadForm(self.xmlDoc, "SpaceStashBankWindow", nil, self)
@@ -85,108 +87,47 @@ function SpaceStashBank:OnDocumentReady()
     self.wndNextBankBagCost = self.wndMain:FindChild("BankBuyPrice")
 
   self.xmlDoc = nil
-  self.bWindowCreated = true
-
-  if self.bSavedDataRestored then 
-    self:OnSpaceStashBankReady()
-  end
-end
-
--- Called when player has loaded and entered the world
-function SpaceStashBank:OnEnable()
-  glog = GeminiLogging:GetLogger({
-    level = GeminiLogging.INFO,
-    pattern = "%d [%c:%n] %l - %m",
-    appender = "Print"
-  })
-
-  Apollo.RegisterEventHandler("HideBank", "OnHideBank", self)
-  Apollo.RegisterEventHandler("ShowBank", "OnShowBank", self)
-
-end
-
--- Replaces MyAddon:OnSave
-function SpaceStashBank:OnSaveSettings(eLevel)
-  if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then 
-    return
-  end
-
-  return self.tConfig
-end
-
--- Replaces MyAddon:OnRestore
-function SpaceStashBank:OnRestoreSettings(eLevel, tSavedData)
-  if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then 
-    return
-  elseif tSavedData == nil or tSavedData.version == nil or tSavedData.version.MAJOR ~= MAJOR then --change to corrupted save in general?
-
-  elseif tSavedData.version.MINOR < MINOR then
-
-  else
-    self.tConfig = tSavedData
-  end
-  self.bSavedDataRestored = true
-
-  if self.bWindowCreated then
-    self:OnSpaceStashBankReady()
-  end
-end
-
-function SpaceStashBank:OnSpaceStashBankReady()
-
-  Apollo.RegisterSlashCommand("ssb", "OnSlashCommand", self)
-  Apollo.RegisterEventHandler("BankSlotPurchased", "OnBankSlotPurchased", self)
-  Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "OnEquippedItemChanged", self)
-  Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
 
   self.bottomFrameHeight = self.wndBottomFrame:GetHeight()
   self.wndNextBankBagCost:SetAmount(GameLib.GetNextBankBagCost():GetAmount(), true)
   self.wndCash:SetAmount(GameLib.GetPlayerCurrency(), true)
-
-  local nBankBagSlots = GameLib.GetNumBankBagSlots()
-  if nBankBagSlots > 0 then
-    for k, v in ipairs(self.wndBankBags) do
-      if k <= nBankBagSlots then
-        v:Show(true)
-        v:FindChild("BuyBankSlotButton"):Destroy()
-      elseif k == nBankBagSlots +1 then
-        v:Show(true)
-        v:FindChild("BuyBankSlotButton"):SetTooltip(L["BUYBANKBAGSLOT"])
-      end
-    end
-  end
-
   
+  self:UpdateBankBagSlots()
   self:UpdateTabState()
   self:OnIconSizeChange()
   self:UpdateWindowSize()
 
   GeminiLocale:TranslateWindow(L, self.wndMain)
 
-  self.bReady = true
-  self.wndMain:Show(self.bEarlyShowBank,true)
+  bDocumentCreated = true
 end
 
-function SpaceStashBank:OnHideBank()
-  if self.bReady then
-    
-    self.wndMain:Show(false,true)
-  else
-    self.bEarlyShowBank = false
+-- Called when player has loaded and entered the world
+function SpaceStashBank:OnEnable()
+  
+  Apollo.RegisterSlashCommand("ssb", "OnSlashCommand", self)
+  Apollo.RegisterEventHandler("BankSlotPurchased", "OnBuyBankSlot", self)
+  Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "OnEquippedItemChanged", self)
+  Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
+  Apollo.RegisterEventHandler("HideBank", "OnHideBank", self)
+  Apollo.RegisterEventHandler("ShowBank", "OnShowBank", self)
+
+  if bDocumentCreated then 
+    self:UpdateBankBagSlots()
   end
+end
+
+
+function SpaceStashBank:OnHideBank()
+  self.wndMain:Show(false,true)
 end
 
 function SpaceStashBank:OnShowBank()
-  if self.bReady then
-    self.wndMain:Show(true,true)  
-  else
-    self.bEarlyShowBank = true
-  end
-  
+  self.wndMain:Show(true,true)  
 end
 
 function SpaceStashBank:OnWindowMove()
-  self.tConfig.location.x, self.tConfig.location.y = self.wndMain:GetPos()
+  self.db.profile.config.location.x, self.db.profile.config.location.y = self.wndMain:GetPos()
 
 end
 
@@ -199,32 +140,11 @@ function SpaceStashBank:OnSlashCommand(strCommand, strParam)
     self:OnShowBank()
   elseif strParam == "info" then 
     glog:info(self)
-  elseif string.find(string.lower(strParam), "option") ~= nil then
-    
-    local args = {}
-
-    for arg in string.gmatch(strParam, "[%a%d]+") do table.insert(args, arg) end
-
-    if string.lower(args[2]) == "rowsize" then
-      local size = string.match(args[3],"%d+")
-      if size ~= nil then
-        self.tConfig.RowSize = size
-        self:OnRowSizeChange()
-        self:UpdateWindowSize()
-      end
-    elseif string.lower(args[2]) == "iconsize" then
-      local size = string.match(args[3],"%d+")
-      if size ~= nil then
-        self.tConfig.IconSize = size
-        self:OnIconSizeChange()
-        self:UpdateWindowSize()
-      end
-    end
   end
 end
 
 function SpaceStashBank:UpdateTabState()
-  if self.tConfig.SelectedTab == CodeEnumTabDisplay.BankBags then
+  if self.db.profile.config.SelectedTab == SpaceStashBank.CodeEnumTabDisplay.BankBags then
     self.topFrameHeight = self.wndMenuFrame:GetHeight() + self.wndBankBagsTabFrame:GetHeight()
     self.wndBankBagsTabFrame:Show(true)
     self.btnBankBagsTab:SetCheck(true)
@@ -236,7 +156,7 @@ function SpaceStashBank:UpdateTabState()
 end
 
 function SpaceStashBank:OnBankBagsTabChecked( wndHandler, wndControl, eMouseButton )
-  self.tConfig.SelectedTab = CodeEnumTabDisplay.BankBags
+  self.db.profile.config.SelectedTab = SpaceStashBank.CodeEnumTabDisplay.BankBags
   self:UpdateTabState()
 
   self:OnIconSizeChange()
@@ -244,7 +164,7 @@ function SpaceStashBank:OnBankBagsTabChecked( wndHandler, wndControl, eMouseButt
 end
 
 function SpaceStashBank:OnBankBagsTabUnhecked( wndHandler, wndControl, eMouseButton )
-  self.tConfig.SelectedTab = CodeEnumTabDisplay.None
+  self.db.profile.config.SelectedTab = SpaceStashBank.CodeEnumTabDisplay.None
   self:UpdateTabState()
   self:UpdateWindowSize();
 end
@@ -268,39 +188,47 @@ function SpaceStashBank:OnClose( wndHandler, wndControl, eMouseButton )
   self:OnHideBank()
 end
 
-function SpaceStashBank:OnBuyBankSlot()
-
-  GameLib.BuyBankBagSlot()
-  self.wndNextBankBagCost:SetAmount(GameLib.GetNextBankBagCost():GetAmount(), true)
+function SpaceStashBank:UpdateBankBagSlots()
   local nBankBagSlots = GameLib.GetNumBankBagSlots()
-  if nBankBagSlots ~= 5 then
 
-    if nBankBagSlots > 0 then
-      for k, v in ipairs(self.wndBankBags) do
-        if k <= nBankBagSlots then
-          v:Show(true)
-          if v:FindChild("BuyBankSlotButton") then v:FindChild("BuyBankSlotButton"):Destroy() end
-          
-        elseif k == nBankBagSlots +1 then
-          v:Show(true)
-          v:FindChild("BuyBankSlotButton"):SetTooltip(L["BUYBANKBAGSLOT"])
-        end
+  if nBankBagSlots > 0 then
+    for k, v in ipairs(self.wndBankBags) do
+      if k <= nBankBagSlots then
+        v:Show(true)
+        if v:FindChild("BuyBankSlotButton") then v:FindChild("BuyBankSlotButton"):Destroy() end
+        
+      elseif k == nBankBagSlots+1 then
+        v:Show(true)
+        v:FindChild("BuyBankSlotButton"):SetTooltip(L["BUYBANKBAGSLOT"])
+        v:FindChild("BuyBankSlotButton"):Enable(true)
+      else
+        v:Show(false)
+        v:FindChild("BuyBankSlotButton"):Enable(false)
       end
     end
+  end
 
-  else
-    self.wndMain:FindChild("NextBagCost"):Destroy()
+  if nBankBagSlots == 5 then
+    if self.wndMain:FindChild("NextBagCost") then self.wndMain:FindChild("NextBagCost"):Destroy() end
     self.wndBottomFrame:FindChild("CashFrame"):SetAnchorOffsets(0,0,0,0)
     self.wndBottomFrame:FindChild("BankCashFrame"):SetAnchorOffsets(-256,-46,-8,-4)
     self.wndBottomFrame:SetAnchorOffsets(0,-50,0,0)
     
     SpaceStashBank:UpdateWindowSize()
   end
+  self.wndBankBagsTabFrame:ArrangeChildrenHorz(0)
+end
+
+function SpaceStashBank:OnBuyBankSlot()
+    GameLib.BuyBankBagSlot()
+    self.wndNextBankBagCost:SetAmount(GameLib.GetNextBankBagCost():GetAmount(), true)
+    self:UpdateBankBagSlots()
+
 end
 
 function SpaceStashBank:OnGenerateTooltip( wndControl, wndHandler, tType, item )
   if wndControl ~= wndHandler then return end
-  wndControl:SetTooltipDoc(nil)
+  wndControl:SetTooltipDoc(nil) 
   if item ~= nil then 
     local itemEquipped = item:GetEquippedItemForItemType()
     Tooltip.GetItemTooltipForm(self, wndControl, item, {bPrimary = true, bSelling = false, itemCompare = itemEquipped})
@@ -331,27 +259,27 @@ function SpaceStashBank:OnEquippedItemChanged()
 end
 
 function SpaceStashBank:OnRowSizeChange()
-  self.wndBank:SetBoxesPerRow(self.tConfig.RowSize)
+  self.wndBank:SetBoxesPerRow(self.db.profile.config.RowSize)
 
-  self.rowCount = math.floor(self.wndBank:GetBagCapacity() / self.tConfig.RowSize)
-  if self.wndBank:GetBagCapacity() % self.tConfig.RowSize ~= 0 then self.rowCount = self.rowCount +1 end
+  self.rowCount = math.floor(self.wndBank:GetBagCapacity() / self.db.profile.config.RowSize)
+  if self.wndBank:GetBagCapacity() % self.db.profile.config.RowSize ~= 0 then self.rowCount = self.rowCount +1 end
 
 end
 
 function SpaceStashBank:OnIconSizeChange()
 
-  self.wndBank:SetSquareSize(self.tConfig.IconSize, self.tConfig.IconSize)
+  self.wndBank:SetSquareSize(self.db.profile.config.IconSize, self.db.profile.config.IconSize)
 
-  self.wndBankBagsTabFrame:SetAnchorOffsets(1,self.wndMenuFrame:GetHeight(),0,self.wndMenuFrame:GetHeight() + self.tConfig.IconSize )
+  self.wndBankBagsTabFrame:SetAnchorOffsets(1,self.wndMenuFrame:GetHeight(),0,self.wndMenuFrame:GetHeight() + self.db.profile.config.IconSize )
 
   
 
   for k,v in ipairs(self.wndBankBags) do
-  	v:SetAnchorOffsets(0,0,self.tConfig.IconSize,self.tConfig.IconSize)
+  	v:SetAnchorOffsets(0,0,self.db.profile.config.IconSize,self.db.profile.config.IconSize)
   end
   self.wndBankBagsTabFrame:ArrangeChildrenHorz(0)
 
-  if self.tConfig.SelectedTab == CodeEnumTabDisplay.BankBags then
+  if self.db.profile.config.SelectedTab == SpaceStashBank.CodeEnumTabDisplay.BankBags then
     self.topFrameHeight = self.wndMenuFrame:GetHeight() + self.wndBankBagsTabFrame:GetHeight()
   else
     self.topFrameHeight = self.wndMenuFrame:GetHeight()
@@ -370,17 +298,17 @@ end
 function SpaceStashBank:UpdateLocation()
 
   self.wndMain:SetAnchorOffsets(
-    self.tConfig.location.x,
-    self.tConfig.location.y,
-    self.tConfig.location.x + self.nInventoryFrameWidth - self.leftOffset + self.rightOffset,
-    self.tConfig.location.y + self.nInventoryFrameHeight + self.bottomFrameHeight + self.topFrameHeight - self.topOffset + self.bottomOffset)
+    self.db.profile.config.location.x,
+    self.db.profile.config.location.y,
+    self.db.profile.config.location.x + self.nInventoryFrameWidth - self.leftOffset + self.rightOffset,
+    self.db.profile.config.location.y + self.nInventoryFrameHeight + self.bottomFrameHeight + self.topFrameHeight - self.topOffset + self.bottomOffset)
 
 end
 
 function SpaceStashBank:UpdateWindowSize()
 
-  self.nInventoryFrameHeight = self.rowCount * self.tConfig.IconSize
-  self.nInventoryFrameWidth = self.tConfig.IconSize * self.tConfig.RowSize
+  self.nInventoryFrameHeight = self.rowCount * self.db.profile.config.IconSize
+  self.nInventoryFrameWidth = self.db.profile.config.IconSize * self.db.profile.config.RowSize
 
   self.leftOffset, self.topOffset, self.rightOffset, self.bottomOffset = self.wndContentFrame:GetAnchorOffsets()
 
@@ -405,27 +333,25 @@ function SpaceStashBank:UpdateWindowSize()
 
 end
 
-
-
 -----------------------------------------------------------------------------------------------
 -- SpaceStashBank Setters / Getters
 -----------------------------------------------------------------------------------------------
 function SpaceStashBank:SetIconsSize(nSize)
-  self.tConfig.IconSize = nSize
+  self.db.profile.config.IconSize = nSize
   self:OnIconSizeChange()
   self:UpdateWindowSize()
 end
 
 function SpaceStashBank:GetIconsSize()
-  return self.tConfig.IconSize
+  return self.db.profile.config.IconSize
 end
 
 function SpaceStashBank:SetRowsSize(nSize)
-  self.tConfig.RowSize = nSize
+  self.db.profile.config.RowSize = nSize
   self:OnRowSizeChange()
   self:UpdateWindowSize()
 end
 
 function SpaceStashBank:GetRowsSize()
-  return self.tConfig.RowSize
+  return self.db.profile.config.RowSize
 end
