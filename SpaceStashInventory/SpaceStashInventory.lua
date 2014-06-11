@@ -13,7 +13,7 @@ require "Sound"
 -----------------------------------------------------------------------------------------------
 -- Constants and Defaults parameters
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "SpaceStashInventory-Beta", 17
+local MAJOR, MINOR = "SpaceStashInventory-Beta", 18
 
 -----------------------------------------------------------------------------------------------
 -- Libraries
@@ -41,9 +41,6 @@ defaults.profile.version.MAJOR = MAJOR
 defaults.profile.version.MINOR = MINOR
 defaults.profile.config.IconSize = 36
 defaults.profile.config.RowSize = 10
-defaults.profile.config.location = {}
-defaults.profile.config.location.x = 64
-defaults.profile.config.location.y = 64
 defaults.profile.config.currencies = {eCurrencyType = Money.CodeEnumCurrencyType.Renown}
 defaults.profile.config.SelectedTab = SpaceStashInventory.CodeEnumTabDisplay.BagsTab
 
@@ -165,9 +162,9 @@ function SpaceStashInventory:OnDocumentReady()
 
   Apollo.RegisterSlashCommand("ssi", "OnSSCmd", self)
   Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
-  
+  Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
+
   Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
-  Apollo.RegisterEventHandler("WindowMove", "OnWindowMove", self)
   Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "Redraw", self)
 
   Apollo.RegisterEventHandler("GuildBank_ShowPersonalInventory", "OnVisibilityToggle", self)
@@ -196,6 +193,10 @@ end
 
 function SpaceStashInventory:OnInterfaceMenuListHasLoaded()
 	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", Apollo.GetString("InterfaceMenu_Inventory"), {"InterfaceMenu_ToggleInventory", "Inventory", ""})
+end
+
+function SpaceStashInventory:OnWindowManagementReady()
+	Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = "SpaceStashInventory"})
 end
 
 -----------------------------------------------------------------------------------------------
@@ -402,7 +403,7 @@ function  SpaceStashInventory:OnWindowMove()
 	-- TODO: Check that the window is in the screen
 	-- TODO: add an option to keep the entire frame in screen
 
-	self.db.profile.config.location.x, self.db.profile.config.location.y = self.wndMain:GetPos()
+	
 end
 
 
@@ -494,12 +495,13 @@ function SpaceStashInventory:OnInventoryDisplayChange()
 
 	local nInventoryFrameHeight = self.rowCount * self.db.profile.config.IconSize
 	local nInventoryFrameWidth = self.db.profile.config.IconSize * self.db.profile.config.RowSize
+	local x, y = self.wndMain:GetPos()
 
 	self.wndMain:SetAnchorOffsets(
-		self.db.profile.config.location.x,
-		self.db.profile.config.location.y,
-		self.db.profile.config.location.x + nInventoryFrameWidth - self.leftOffset + self.rightOffset,
-		self.db.profile.config.location.y + self.topFrameHeight + self.bottomFrameHeight + nInventoryFrameHeight - self.topOffset + self.bottomOffset + 4)
+		x,
+		y,
+		x + nInventoryFrameWidth - self.leftOffset + self.rightOffset,
+		y + self.topFrameHeight + self.bottomFrameHeight + nInventoryFrameHeight - self.topOffset + self.bottomOffset + 4)
 	
 end
 
@@ -714,110 +716,12 @@ function SpaceStashInventory:OnCloseCurrenciesMicroMenu()
   self.wndCurrenciesMicroMenu:Show(false,true)
 end
 
-function SpaceStashInventory:SetSortMehtod(nSortMethod)
-  self.db.profile.config.sort = nSortMethod
-
-  if nSortMethod == 1 then
-    self.wndBagWindow:SetSort(true)
-    self.wndBagWindow:SetItemSortComparer(self.fnSortItemsByName)
-    
-  elseif nSortMethod == 2 then
-    self.wndBagWindow:SetSort(true)
-    self.wndBagWindow:SetItemSortComparer(self.fnSortItemsByQuality)
-    
-  elseif nSortMethod == 3 then
-    self.wndBagWindow:SetSort(true)
-    self.wndBagWindow:SetItemSortComparer(self.fnSortItemsByCategory)
-    
-  else
-    self.wndBagWindow:SetSort(false)
-  end
-  
-end
-
-function SpaceStashInventory.fnSortItemsByName(itemLeft, itemRight)
-  if itemLeft == itemRight then
-    return 0
-  end
-  if itemLeft and itemRight == nil then
-    return -1
-  end
-  if itemLeft == nil and itemRight then
-    return 1
-  end
-  
-  local strLeftName = itemLeft:GetName()
-  local strRightName = itemRight:GetName()
-  if strLeftName < strRightName then
-    return -1
-  end
-  if strLeftName > strRightName then
-    return 1
-  end
-  
-  return 0
-end
-
-function SpaceStashInventory.fnSortItemsByCategory(itemLeft, itemRight)
-  if itemLeft == itemRight then
-    return 0
-  end
-  if itemLeft and itemRight == nil then
-    return -1
-  end
-  if itemLeft == nil and itemRight then
-    return 1
-  end
-  
-  local strLeftName = itemLeft:GetItemCategoryName()
-  local strRightName = itemRight:GetItemCategoryName()
-  if strLeftName < strRightName then
-    return -1
-  end
-  if strLeftName > strRightName then
-    return 1
-  end
-  
-  local strLeftName = itemLeft:GetName()
-  local strRightName = itemRight:GetName()
-  if strLeftName < strRightName then
-    return -1
-  end
-  if strLeftName > strRightName then
-    return 1
-  end
-  
-  return 0
-end
-
-function SpaceStashInventory.fnSortItemsByQuality(itemLeft, itemRight)
-  if itemLeft == itemRight then
-    return 0
-  end
-  if itemLeft and itemRight == nil then
-    return -1
-  end
-  if itemLeft == nil and itemRight then
-    return 1
-  end
-  
-  local eLeftQuality = itemLeft:GetItemQuality()
-  local eRightQuality = itemRight:GetItemQuality()
-  if eLeftQuality > eRightQuality then
-    return -1
-  end
-  if eLeftQuality < eRightQuality then
-    return 1
-  end
-  
-  local strLeftName = itemLeft:GetName()
-  local strRightName = itemRight:GetName()
-  if strLeftName < strRightName then
-    return -1
-  end
-  if strLeftName > strRightName then
-    return 1
-  end
-  
-  return 0
+function SpaceStashInventory:SetSortMehtod(fSortMethod)
+	if not fSortMethod then 
+		self.wndBagWindow:SetSort(false)
+		return
+	elseif type(fSortMethod) == "function" then
+		self.wndBagWindow:SetSort(true)
+    	self.wndBagWindow:SetItemSortComparer(fSortMethod)
+	end
 end

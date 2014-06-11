@@ -1,7 +1,7 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashCore-Beta", 7
+local MAJOR, MINOR = "SpaceStashCore-Beta", 8
 
 -----------------------------------------------------------------------------------------------
 -- Libraries
@@ -62,8 +62,7 @@ function SpaceStashCore:OnInitialize()
 
   self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
 
-  self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashCore.xml")
-  self.xmlDoc:RegisterCallback("OnDocumentReady", self)
+  
 
   GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
   inspect = Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
@@ -179,6 +178,9 @@ function SpaceStashCore:OnEnable()
   Apollo.RegisterEventHandler("GenericEvent_OpenToSpecificTechTree",   "OnShowCraftingStation", self)
   Apollo.RegisterEventHandler("GenericEvent_OpenToSearchSchematic",   "OnShowCraftingStation", self)
   Apollo.RegisterEventHandler("AlwaysShowTradeskills",   "OnShowCraftingStation", self)
+
+  self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashCore.xml")
+  self.xmlDoc:RegisterCallback("OnDocumentReady", self)
 end
 
 
@@ -217,13 +219,13 @@ elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQual
 elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
   self.SSCSellQualityChooserButton:FindChild("Choice4"):SetCheck(true)
   self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice4"):GetText())
-elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Superb then
+elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
   self.SSCSellQualityChooserButton:FindChild("Choice5"):SetCheck(true)
   self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice5"):GetText())
-elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Legendary then
+elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
   self.SSCSellQualityChooserButton:FindChild("Choice6"):SetCheck(true)
   self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice6"):GetText())
-elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Artifact then
+elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
   self.SSCSellQualityChooserButton:FindChild("Choice7"):SetCheck(true)
   self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice7"):GetText())
 end
@@ -241,6 +243,8 @@ elseif self.db.profile.config.auto.inventory.sort == 3 then
   self.SSISortChooserButton:FindChild("Choice4"):SetCheck(true)
   self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice4"):GetText())
 end
+
+self:SetSortMehtod(self.db.profile.config.auto.inventory.sort)
   GeminiLocale:TranslateWindow(L, self.wndMain)
 
 end
@@ -486,6 +490,93 @@ function SpaceStashCore:OnInventorySortChooserContainerClose()
   self.SSISortChooserButton:SetCheck(false)
 end
 
+local fnSortItemsByName = function(itemLeft, itemRight)
+  if itemLeft == itemRight then
+    return 0
+  end
+  if itemLeft and itemRight == nil then
+    return -1
+  end
+  if itemLeft == nil and itemRight then
+    return 1
+  end
+  
+  local strLeftName = itemLeft:GetName()
+  local strRightName = itemRight:GetName()
+  if strLeftName < strRightName then
+    return -1
+  end
+  if strLeftName > strRightName then
+    return 1
+  end
+  
+  return 0
+end
+
+local fnSortItemsByCategory = function(itemLeft, itemRight)
+  if itemLeft == itemRight then
+    return 0
+  end
+  if itemLeft and itemRight == nil then
+    return -1
+  end
+  if itemLeft == nil and itemRight then
+    return 1
+  end
+  
+  local strLeftName = itemLeft:GetItemCategoryName()
+  local strRightName = itemRight:GetItemCategoryName()
+  if strLeftName < strRightName then
+    return -1
+  end
+  if strLeftName > strRightName then
+    return 1
+  end
+  
+  local strLeftName = itemLeft:GetName()
+  local strRightName = itemRight:GetName()
+  if strLeftName < strRightName then
+    return -1
+  end
+  if strLeftName > strRightName then
+    return 1
+  end
+  
+  return 0
+end
+
+local fnSortItemsByQuality = function(itemLeft, itemRight)
+  if itemLeft == itemRight then
+    return 0
+  end
+  if itemLeft and itemRight == nil then
+    return -1
+  end
+  if itemLeft == nil and itemRight then
+    return 1
+  end
+  
+  local eLeftQuality = itemLeft:GetItemQuality()
+  local eRightQuality = itemRight:GetItemQuality()
+  if eLeftQuality > eRightQuality then
+    return -1
+  end
+  if eLeftQuality < eRightQuality then
+    return 1
+  end
+  
+  local strLeftName = itemLeft:GetName()
+  local strRightName = itemRight:GetName()
+  if strLeftName < strRightName then
+    return -1
+  end
+  if strLeftName > strRightName then
+    return 1
+  end
+  
+  return 0
+end
+
 function SpaceStashCore:OnInventorySortSelected(wndHandler, wndControl)
   if wndHandler == wndControl then
     if wndHandler:GetName() == "Choice1" then
@@ -502,10 +593,29 @@ function SpaceStashCore:OnInventorySortSelected(wndHandler, wndControl)
     self.SSISortChooserButton:FindChild("ChoiceContainer"):Show(false,true)
   end
   self:OnInventorySortChooserContainerClose()
+
   if SpaceStashInventory then
-    SpaceStashInventory:SetSortMehtod(self.db.profile.config.auto.inventory.sort)
+    self:SetSortMehtod(self.db.profile.config.auto.inventory.sort)
   end
 end
+
+function SpaceStashCore:SetSortMehtod(nSortMethod)
+  self.db.profile.config.sort = nSortMethod
+
+
+
+  if nSortMethod == 1 then
+    SpaceStashInventory:SetSortMehtod(fnSortItemsByName)
+  elseif nSortMethod == 2 then
+    SpaceStashInventory:SetSortMehtod(fnSortItemsByQuality)
+  elseif nSortMethod == 3 then
+    SpaceStashInventory:SetSortMehtod(fnSortItemsByCategory)
+  elseif nSortMethod == 0 then 
+    SpaceStashInventory:SetSortMehtod()
+  end
+  
+end
+
 
 function SpaceStashCore:OnSellQualityChooserToggle( wndHandler, wndControl )
   self.SSCSellQualityChooserButton:FindChild("ChoiceContainer"):Show(self.SSCSellQualityChooserButton:IsChecked(),true)

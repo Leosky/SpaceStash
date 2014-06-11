@@ -1,7 +1,7 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashBank-Beta", 8
+local MAJOR, MINOR = "SpaceStashBank-Beta", 10
 
 
 
@@ -14,7 +14,7 @@ local tItemSlotBGPixie = {loc = {fPoints = {0,0,1,10},nOffsets = {0,0,0,0},},str
 -- Libraries
 -----------------------------------------------------------------------------------------------
 local GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
-local SpaceStashBank, glog = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("SpaceStashBank")
+local SpaceStashBank, glog, LibDialog = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("SpaceStashBank")
 local L = GeminiLocale:GetLocale("SpaceStashBank", true)
 
 SpaceStashBank.CodeEnumTabDisplay = {
@@ -30,9 +30,6 @@ defaults.profile.version.MAJOR = MAJOR
 defaults.profile.version.MINOR = MINOR
 defaults.profile.config.IconSize = 36
 defaults.profile.config.RowSize = 10
-defaults.profile.config.location = {}
-defaults.profile.config.location.x = 64
-defaults.profile.config.location.y = 64
 defaults.profile.config.SelectedTab = SpaceStashBank.CodeEnumTabDisplay.None
 
 -- Replaces MyAddon:OnLoad
@@ -40,8 +37,7 @@ function SpaceStashBank:OnInitialize()
 
   self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
 
-  self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashBank.xml")
-  self.xmlDoc:RegisterCallback("OnDocumentReady", self)
+  
 
   glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
     level = "INFO",
@@ -49,6 +45,33 @@ function SpaceStashBank:OnInitialize()
     appender = "Print"
   })
 
+  LibDialog = Apollo.GetPackage("Gemini:LibDialog-1.0").tPackage
+
+  LibDialog:Register("Confirm", {
+    buttons = {
+      {
+        text = Apollo.GetString("CRB_Yes"),
+        OnClick = function(settings, data, reason)
+          self:OnBuyBankSlot()
+        end,
+      },
+      {
+        color = "Red",
+        text = Apollo.GetString("CRB_No"),
+        OnClick = function(settings, data, reason)
+          
+        end,
+      },
+    },
+    OnCancel = function(settings, data, reason)
+      if reason == "timeout" then
+       
+      end
+    end,
+    text = "Are you sure ?",
+    duration = 10,
+    showWhileDead=true,
+  })
 end
 
 local bDocumentCreated = false
@@ -89,7 +112,6 @@ function SpaceStashBank:OnDocumentReady()
   self.xmlDoc = nil
 
   self.bottomFrameHeight = self.wndBottomFrame:GetHeight()
-  self.wndNextBankBagCost:SetAmount(GameLib.GetNextBankBagCost():GetAmount(), true)
   self.wndCash:SetAmount(GameLib.GetPlayerCurrency(), true)
   
   self:UpdateBankBagSlots()
@@ -98,37 +120,36 @@ function SpaceStashBank:OnDocumentReady()
   self:UpdateWindowSize()
 
   GeminiLocale:TranslateWindow(L, self.wndMain)
-
-  bDocumentCreated = true
+  self.wndNextBankBagCost:SetAmount(GameLib.GetNextBankBagCost():GetAmount(), true)
 end
 
 -- Called when player has loaded and entered the world
 function SpaceStashBank:OnEnable()
   
   Apollo.RegisterSlashCommand("ssb", "OnSlashCommand", self)
-  Apollo.RegisterEventHandler("BankSlotPurchased", "OnBuyBankSlot", self)
   Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "OnEquippedItemChanged", self)
   Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
   Apollo.RegisterEventHandler("HideBank", "OnHideBank", self)
   Apollo.RegisterEventHandler("ShowBank", "OnShowBank", self)
 
-  if bDocumentCreated then 
-    self:UpdateBankBagSlots()
-  end
+  Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
+
+  self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashBank.xml")
+  self.xmlDoc:RegisterCallback("OnDocumentReady", self)
 end
 
+function SpaceStashBank:OnWindowManagementReady()
+  Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = "SpaceStashBank"})
+end
 
 function SpaceStashBank:OnHideBank()
   self.wndMain:Show(false,true)
 end
 
 function SpaceStashBank:OnShowBank()
+  self:OnIconSizeChange()
+  self:UpdateWindowSize()
   self.wndMain:Show(true,true)  
-end
-
-function SpaceStashBank:OnWindowMove()
-  self.db.profile.config.location.x, self.db.profile.config.location.y = self.wndMain:GetPos()
-
 end
 
 function SpaceStashBank:OnPlayerCurrencyChanged()
@@ -200,10 +221,8 @@ function SpaceStashBank:UpdateBankBagSlots()
       elseif k == nBankBagSlots+1 then
         v:Show(true)
         v:FindChild("BuyBankSlotButton"):SetTooltip(L["BUYBANKBAGSLOT"])
-        v:FindChild("BuyBankSlotButton"):Enable(true)
       else
         v:Show(false)
-        v:FindChild("BuyBankSlotButton"):Enable(false)
       end
     end
   end
@@ -217,6 +236,10 @@ function SpaceStashBank:UpdateBankBagSlots()
     SpaceStashBank:UpdateWindowSize()
   end
   self.wndBankBagsTabFrame:ArrangeChildrenHorz(0)
+end
+
+function SpaceStashBank:OnSlotButtonClick()
+  LibDialog:Spawn("Confirm")
 end
 
 function SpaceStashBank:OnBuyBankSlot()
@@ -296,12 +319,13 @@ function SpaceStashBank:OnOptions()
 end
 
 function SpaceStashBank:UpdateLocation()
+  local x, y = self.wndMain:GetPos()
 
   self.wndMain:SetAnchorOffsets(
-    self.db.profile.config.location.x,
-    self.db.profile.config.location.y,
-    self.db.profile.config.location.x + self.nInventoryFrameWidth - self.leftOffset + self.rightOffset,
-    self.db.profile.config.location.y + self.nInventoryFrameHeight + self.bottomFrameHeight + self.topFrameHeight - self.topOffset + self.bottomOffset)
+    x,
+    y,
+    x + self.nInventoryFrameWidth - self.leftOffset + self.rightOffset,
+    y + self.nInventoryFrameHeight + self.bottomFrameHeight + self.topFrameHeight - self.topOffset + self.bottomOffset)
 
 end
 

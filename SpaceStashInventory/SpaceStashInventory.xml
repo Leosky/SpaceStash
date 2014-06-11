@@ -138,7 +138,6 @@
                 </Control>
             </Control>
         </Control>
-        <Event Name="WindowMove" Function="OnWindowMove"/>
         <Event Name="WindowClosed" Function="OnClose"/>
     </Form>
     <Form Class="Window" LAnchorPoint=".5" LAnchorOffset="-162" TAnchorPoint=".5" TAnchorOffset="-224" RAnchorPoint=".5" RAnchorOffset="161" BAnchorPoint=".5" BAnchorOffset="-31" RelativeToClient="1" Font="CRB_InterfaceMedium" Text="" Template="Default" Name="InventoryDeleteNotice" Border="0" Picture="1" SwallowMouseClicks="1" Moveable="1" Escapable="1" Overlapped="1" BGColor="white" TextColor="white" NoClip="0" Visible="0" Sprite="" TooltipColor="" Tooltip="">
