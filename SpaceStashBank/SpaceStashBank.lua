@@ -121,6 +121,7 @@ function SpaceStashBank:OnDocumentReady()
 
   GeminiLocale:TranslateWindow(L, self.wndMain)
   self.wndNextBankBagCost:SetAmount(GameLib.GetNextBankBagCost():GetAmount(), true)
+  Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashBank"})  
 end
 
 -- Called when player has loaded and entered the world

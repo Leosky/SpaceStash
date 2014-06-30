@@ -247,6 +247,7 @@ end
 self:SetSortMehtod(self.db.profile.config.auto.inventory.sort)
   GeminiLocale:TranslateWindow(L, self.wndMain)
 
+  Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashCore"})  
 end
 
 function SpaceStashCore:OnSlashCommand(strCommand, strParam)
