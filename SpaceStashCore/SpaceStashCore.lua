@@ -1,7 +1,7 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashCore-Beta", 8
+local MAJOR, MINOR = "SpaceStashCore-Beta", 11
 
 -----------------------------------------------------------------------------------------------
 -- Libraries
@@ -38,6 +38,8 @@ defaults.profile.config.auto.inventory.mailbox = false
 defaults.profile.config.auto.inventory.engravingstation = false
 defaults.profile.config.auto.inventory.craftingstation = false
 defaults.profile.config.auto.inventory.sort = 0
+defaults.profile.config.auto.bank = {}
+defaults.profile.config.auto.bank.sort = 0
 defaults.profile.config.auto.repair = false
 defaults.profile.config.auto.sell = {}
 defaults.profile.config.auto.sell.whitelist = {}
@@ -53,25 +55,23 @@ defaults.profile.config.auto.sell.filters.Crafting = { active = false, filter = 
 defaults.profile.config.auto.sell.filters.AMP = { active = false, filter = 5, group = 2 }
 defaults.profile.config.auto.sell.filters.Costumes = { active = false, filter = 6, group = 2 }
 defaults.profile.config.auto.sell.filters.Schematics = { active = false, filter = 7, group = 2 }
-
 defaults.profile.config.auto.sell.QualityTreshold = 1
-
+defaults.profile.config.DisplayNew = true
 
 -- Replaces MyAddon:OnLoad
 function SpaceStashCore:OnInitialize()
 
-  self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
+	self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
 
-  
+	GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
+	inspect = Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
+	L = GeminiLocale:GetLocale("SpaceStashCore", true)
 
-  GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
-  inspect = Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
-  L = GeminiLocale:GetLocale("SpaceStashCore", true)
-  SpaceStashInventory = Apollo.GetAddon("SpaceStashInventory")
-  SpaceStashBank = Apollo.GetAddon("SpaceStashBank")
+	SpaceStashInventory = Apollo.GetAddon("SpaceStashInventory")
+	SpaceStashBank = Apollo.GetAddon("SpaceStashBank")
 
-  self.filters = {}
- 	self.filters.Salvagable = ItemFilterProperty_Salvagable
+	self.filters = {}
+	self.filters.Salvagable = ItemFilterProperty_Salvagable
 	self.filters.Consumable = ItemFilterFamily_Consumable
 	self.filters.Housing = ItemFilterFamily_Housing
 	self.filters.Crafting = ItemFilterFamily_Crafting
@@ -79,217 +79,274 @@ function SpaceStashCore:OnInitialize()
 	self.filters.Costume = ItemFilterFamily_Costume
 	self.filters.Schematic = ItemFilterFamily_Schematic
 
-  glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
-    level = "INFO",
-    pattern = "%d [%c:%n] %l - %m",
-    appender = "Print"
-  })
+	glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
+		level = "INFO",
+		pattern = "%d [%c:%n] %l - %m",
+		appender = "Print"
+	})
 end
 
 function SpaceStashCore:OnConfigure()
-  Event_FireGenericEvent("SpaceStashCore_OpenOptions", self)
+	Event_FireGenericEvent("SpaceStashCore_OpenOptions", self)
 end
 
 function SpaceStashCore:OnDocumentReady()
 
-  self.wndMain = Apollo.LoadForm(self.xmlDoc, "SpaceStashCoreForm", nil, self)
-  self.targetFrame = self.wndMain:FindChild("TargetFrame")
+	self.wndMain = Apollo.LoadForm(self.xmlDoc, "SpaceStashCoreForm", nil, self)
+	self.targetFrame = self.wndMain:FindChild("TargetFrame")
 
-  self.wndMain:Show(false,true)
+	if self.wndMain == nil then
+		Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
+		return
+	end
 
-  self.SSCOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSCOptionsFrame", self.targetFrame, self)
-  self.SSCAutoVendor = self.SSCOptionsFrame:FindChild("SSCAutoVendor")
-  self.SSCAutoBank = self.SSCOptionsFrame:FindChild("SSCAutoBank")
-  self.SSCAutoAH = self.SSCOptionsFrame:FindChild("SSCAutoAH")
-  self.SSCAutoCE = self.SSCOptionsFrame:FindChild("SSCAutoCE")
-  self.SSCAutoMailbox = self.SSCOptionsFrame:FindChild("SSCAutoMailbox")
-  self.SSCAutoES = self.SSCOptionsFrame:FindChild("SSCAutoES")
-  self.SSCAutoCS = self.SSCOptionsFrame:FindChild("SSCAutoCS")
-  self.SSCAutoRepair = self.SSCOptionsFrame:FindChild("SSCAutoRepair")
-  self.SSCAutoSell = self.SSCOptionsFrame:FindChild("SSCAutoSell")
-  self.SSCSellQualityChooserButton = self.SSCOptionsFrame:FindChild("SellQualityChooserButton")
-  self.SSCSellSavagable = self.SSCOptionsFrame:FindChild("SSCSellSavagable")
-  self.SSCSellConsumables = self.SSCOptionsFrame:FindChild("SSCSellConsumables")
-  self.SSCSellAMP = self.SSCOptionsFrame:FindChild("SSCSellAMP")
-  self.SSCSellHousing = self.SSCOptionsFrame:FindChild("SSCSellHousing")
-  self.SSCSellCrafting = self.SSCOptionsFrame:FindChild("SSCSellCrafting")
-  self.SSCSellCostumes = self.SSCOptionsFrame:FindChild("SSCSellCostumes")
-  self.SSCSellSchematics = self.SSCOptionsFrame:FindChild("SSCSellSchematics")
-  self.SellWhitelist = self.SSCOptionsFrame:FindChild("SellWhitelist")
-  self.SellBlacklist = self.SSCOptionsFrame:FindChild("SellBlacklist")
+	self.wndMain:Show(false,true)
 
-  -----SSI OPtions -----
-  self.SSIOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSIOptionsFrame", self.targetFrame, self)
-  self.SSIElderGemsButton = self.SSIOptionsFrame:FindChild("ElderGemsButton")
-  self.SSIPrestigeButton = self.SSIOptionsFrame:FindChild("PrestigeButton")
-  self.SSIRenownButton = self.SSIOptionsFrame:FindChild("RenownButton")  self.SSICraftingVouchersButton = self.SSIOptionsFrame:FindChild("CraftingVouchersButton")
-  self.SSIIconsSizeSlider = self.SSIOptionsFrame:FindChild("SSIIconsSizeSlider")
-  self.SSIIconsSizeText = self.SSIOptionsFrame:FindChild("SSIIconsSizeText")
-  self.SSIRowsSizeSlider = self.SSIOptionsFrame:FindChild("SSIRowsSizeSlider")
-  self.SSIRowsSizeText = self.SSIOptionsFrame:FindChild("SSIRowsSizeText")
-  self.SSISortChooserButton = self.SSIOptionsFrame:FindChild("SSISortChooserButton")
+	self.SSCOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSCOptionsFrame", self.targetFrame, self)
 
-  --- SSB Options ---
-  self.SSBOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSBOptionsFrame", self.targetFrame, self)
-  self.SSBIconsSizeSlider = self.SSBOptionsFrame:FindChild("SSBIconsSizeSlider")
-  self.SSBIconsSizeText = self.SSBOptionsFrame:FindChild("SSBIconsSizeText")
-  self.SSBRowsSizeSlider = self.SSBOptionsFrame:FindChild("SSBRowsSizeSlider")
-  self.SSBRowsSizeText = self.SSBOptionsFrame:FindChild("SSBRowsSizeText")
-  if self.wndMain == nil or self.SSCOptionsFrame == nil then
-    Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
-    return
-  end
+	if self.SSCOptionsFrame == nil then
+		Apollo.AddAddonErrorText(self, "Could not load SSCOptionsFrame for some reason.")
+		return
+	end
 
-  self.btnSSCOptions = self.wndMain:FindChild("SSCOptionsButton")
-  self.btnSSBOptions = self.wndMain:FindChild("SSBOptionsButton")
-  self.btnSSIOptions = self.wndMain:FindChild("SSIOptionsButton")
+	self.SSCAutoVendor = self.SSCOptionsFrame:FindChild("SSCAutoVendor")
+	self.SSCAutoBank = self.SSCOptionsFrame:FindChild("SSCAutoBank")
+	self.SSCAutoAH = self.SSCOptionsFrame:FindChild("SSCAutoAH")
+	self.SSCAutoCE = self.SSCOptionsFrame:FindChild("SSCAutoCE")
+	self.SSCAutoMailbox = self.SSCOptionsFrame:FindChild("SSCAutoMailbox")
+	self.SSCAutoES = self.SSCOptionsFrame:FindChild("SSCAutoES")
+	self.SSCAutoCS = self.SSCOptionsFrame:FindChild("SSCAutoCS")
+	self.SSCAutoRepair = self.SSCOptionsFrame:FindChild("SSCAutoRepair")
+	self.SSCAutoSell = self.SSCOptionsFrame:FindChild("SSCAutoSell")
+	self.SSCSellQualityChooserButton = self.SSCOptionsFrame:FindChild("SellQualityChooserButton")
+	self.SSCSellSavagable = self.SSCOptionsFrame:FindChild("SSCSellSavagable")
+	self.SSCSellConsumables = self.SSCOptionsFrame:FindChild("SSCSellConsumables")
+	self.SSCSellAMP = self.SSCOptionsFrame:FindChild("SSCSellAMP")
+	self.SSCSellHousing = self.SSCOptionsFrame:FindChild("SSCSellHousing")
+	self.SSCSellCrafting = self.SSCOptionsFrame:FindChild("SSCSellCrafting")
+	self.SSCSellCostumes = self.SSCOptionsFrame:FindChild("SSCSellCostumes")
+	self.SSCSellSchematics = self.SSCOptionsFrame:FindChild("SSCSellSchematics")
+	self.SellWhitelist = self.SSCOptionsFrame:FindChild("SellWhitelist")
+	self.SellBlacklist = self.SSCOptionsFrame:FindChild("SellBlacklist")
 
-  if not SpaceStashInventory then
-    self.btnSSIOptions:Show(false)
-    self.btnSSBOptions:SetAnchorOffsets(0,32,0,64)
-  else
-    self:UpdateTrackedCurrency()
-    self:UpdateInventoryIconsSize()
-    self:UpdateInventoryRowsSize()
-  end
-  
-  if not SpaceStashBank then
-    self.btnSSBOptions:Show(false)
-  else
-    self:UpdateBankRowsSize()
-    self:UpdateBankIconsSize()
-  end
-  
-  self:OnSpaceStashCoreReady()
+	-----SSI OPtions -----
+	self.SSIOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSIOptionsFrame", self.targetFrame, self)
+
+	if self.SSIOptionsFrame == nil and SpaceStashInventory then
+		Apollo.AddAddonErrorText(self, "Could not load SSIOptionsFrame for some reason.")
+		return
+	end
+
+		self.SSIElderGemsButton = self.SSIOptionsFrame:FindChild("ElderGemsButton")
+		self.SSIPrestigeButton = self.SSIOptionsFrame:FindChild("PrestigeButton")
+		self.SSIRenownButton = self.SSIOptionsFrame:FindChild("RenownButton")
+		self.SSICraftingVouchersButton = self.SSIOptionsFrame:FindChild("CraftingVouchersButton")
+		self.SSICashButton = self.SSIOptionsFrame:FindChild("CashButton")
+
+		self.SSIIconsSizeSlider = self.SSIOptionsFrame:FindChild("SSIIconsSizeSlider")
+		self.SSIIconsSizeText = self.SSIOptionsFrame:FindChild("SSIIconsSizeText")
+		self.SSIRowsSizeSlider = self.SSIOptionsFrame:FindChild("SSIRowsSizeSlider")
+		self.SSIRowsSizeText = self.SSIOptionsFrame:FindChild("SSIRowsSizeText")
+		self.SSISortChooserButton = self.SSIOptionsFrame:FindChild("SSISortChooserButton")
+		self.SSCNewItemDisplay = self.SSIOptionsFrame:FindChild("SSCNewItemDisplay")
+
+	--- SSB Options ---
+	self.SSBOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSBOptionsFrame", self.targetFrame, self)
+
+	if self.SSBOptionsFrame == nil and SpaceStashBank then
+		Apollo.AddAddonErrorText(self, "Could not load SSBOptionsFrame	 for some reason.")
+		return
+	end
+
+	self.SSBIconsSizeSlider = self.SSBOptionsFrame:FindChild("SSBIconsSizeSlider")
+	self.SSBIconsSizeText = self.SSBOptionsFrame:FindChild("SSBIconsSizeText")
+	self.SSBRowsSizeSlider = self.SSBOptionsFrame:FindChild("SSBRowsSizeSlider")
+	self.SSBRowsSizeText = self.SSBOptionsFrame:FindChild("SSBRowsSizeText")
+	self.SSBSortChooserButton = self.SSBOptionsFrame:FindChild("SSBSortChooserButton")
+
+	self.btnSSCOptions = self.wndMain:FindChild("SSCOptionsButton")
+	self.btnSSBOptions = self.wndMain:FindChild("SSBOptionsButton")
+	self.btnSSIOptions = self.wndMain:FindChild("SSIOptionsButton")
+
+	if not SpaceStashInventory then
+		self.btnSSIOptions:Show(false)
+		self.btnSSBOptions:SetAnchorOffsets(0,32,0,64)
+	else
+		self:UpdateTrackedCurrency()
+		self:UpdateInventoryIconsSize()
+		self:UpdateInventoryRowsSize()
+	end
+
+	if not SpaceStashBank then
+		self.btnSSBOptions:Show(false)
+	else
+		self:UpdateBankRowsSize()
+		self:UpdateBankIconsSize()
+	end
+
+	self.SSCAutoCS:SetCheck(self.db.profile.config.auto.inventory.craftingstation)
+	self.SSCAutoSell:SetCheck(self.db.profile.config.auto.sell.active)
+	self.SSCSellSavagable:SetCheck(self.db.profile.config.auto.sell.filters.Salvagables.active)
+	self.SSCSellConsumables:SetCheck(self.db.profile.config.auto.sell.filters.Consumables.active)
+	self.SSCSellAMP:SetCheck(self.db.profile.config.auto.sell.filters.AMP.active)
+	self.SSCSellHousing:SetCheck(self.db.profile.config.auto.sell.filters.Housing.active)
+	self.SSCSellCrafting:SetCheck(self.db.profile.config.auto.sell.filters.Crafting.active)
+	self.SSCSellCostumes:SetCheck(self.db.profile.config.auto.sell.filters.Costumes.active)
+	self.SSCSellSchematics:SetCheck(self.db.profile.config.auto.sell.filters.Schematics.active)
+	self.SSCAutoRepair:SetCheck(self.db.profile.config.auto.repair)
+	self.SSCAutoES:SetCheck(self.db.profile.config.auto.inventory.engravingstation)
+
+	self.SSCAutoMailbox:SetCheck(self.db.profile.config.auto.inventory.mailbox)
+	self.SSCAutoCE:SetCheck(self.db.profile.config.auto.inventory.commoditiesexchange)
+	self.SSCAutoAH:SetCheck(self.db.profile.config.auto.inventory.auctionhouse)
+	self.SSCAutoBank:SetCheck(self.db.profile.config.auto.inventory.bank)
+	self.SSCAutoVendor:SetCheck(self.db.profile.config.auto.inventory.vendor)
+	self.SSCNewItemDisplay:SetCheck(self.db.profile.config.displayNew)
+
+	self.SellWhitelist:SetText(self.db.profile.config.auto.sell.whitelistRaw or "")
+	self.SellBlacklist:SetText(self.db.profile.config.auto.sell.blacklistRaw or "")
+
+	if self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Inferior then
+		self.SSCSellQualityChooserButton:FindChild("Choice1"):SetCheck(true)
+		self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice1"):GetText())
+	elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Average then
+		self.SSCSellQualityChooserButton:FindChild("Choice2"):SetCheck(true)
+		self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice2"):GetText())
+	elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Good then
+		self.SSCSellQualityChooserButton:FindChild("Choice3"):SetCheck(true)
+		self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice3"):GetText())
+	elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
+		self.SSCSellQualityChooserButton:FindChild("Choice4"):SetCheck(true)
+		self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice4"):GetText())
+	elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
+		self.SSCSellQualityChooserButton:FindChild("Choice5"):SetCheck(true)
+		self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice5"):GetText())
+	elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
+		self.SSCSellQualityChooserButton:FindChild("Choice6"):SetCheck(true)
+		self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice6"):GetText())
+	elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
+		self.SSCSellQualityChooserButton:FindChild("Choice7"):SetCheck(true)
+		self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice7"):GetText())
+	end
+
+	if self.db.profile.config.auto.inventory.sort == 0 then
+		self.SSISortChooserButton:FindChild("Choice1"):SetCheck(true)
+		self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice1"):GetText())
+	elseif self.db.profile.config.auto.inventory.sort == 1 then
+		self.SSISortChooserButton:FindChild("Choice2"):SetCheck(true)
+		self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice2"):GetText())
+	elseif self.db.profile.config.auto.inventory.sort == 2 then
+		self.SSISortChooserButton:FindChild("Choice3"):SetCheck(true)
+		self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice3"):GetText())
+	elseif self.db.profile.config.auto.inventory.sort == 3 then
+		self.SSISortChooserButton:FindChild("Choice4"):SetCheck(true)
+		self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice4"):GetText())
+	end
+
+
+	if self.db.profile.config.auto.bank.sort == 0 then
+		self.SSBSortChooserButton:FindChild("Choice1"):SetCheck(true)
+		self.SSBSortChooserButton:SetText(self.SSBSortChooserButton:FindChild("Choice1"):GetText())
+	elseif self.db.profile.config.auto.bank.sort == 1 then
+		self.SSBSortChooserButton:FindChild("Choice2"):SetCheck(true)
+		self.SSBSortChooserButton:SetText(self.SSBSortChooserButton:FindChild("Choice2"):GetText())
+	elseif self.db.profile.config.auto.bank.sort == 2 then
+		self.SSBSortChooserButton:FindChild("Choice3"):SetCheck(true)
+		self.SSBSortChooserButton:SetText(self.SSBSortChooserButton:FindChild("Choice3"):GetText())
+	elseif self.db.profile.config.auto.bank.sort == 3 then
+		self.SSBSortChooserButton:FindChild("Choice4"):SetCheck(true)
+		self.SSBSortChooserButton:SetText(self.SSBSortChooserButton:FindChild("Choice4"):GetText())
+	end
+
+	self.SSCNewItemDisplay:SetCheck(self.db.profile.config.DisplayNew)
+
+	if SpaceStashInventory then
+		self:SetInventorySortMehtod(self.db.profile.config.auto.inventory.sort)
+		SpaceStashInventory:SetDisplayNew(self.db.profile.config.DisplayNew)
+	end
+
+	if SpaceStashBank then
+		self:SetBankSortMehtod(self.db.profile.config.auto.bank.sort)
+	end
+	
+	GeminiLocale:TranslateWindow(L, self.wndMain)
+
+	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashCore"})
 end
 
 -- Called when player has loaded and entered the world
 function SpaceStashCore:OnEnable()
-  Apollo.RegisterSlashCommand("ssc", "OnSlashCommand", self)
-  Apollo.RegisterEventHandler("SpaceStashCore_OpenOptions", "OnOpenOptions", self)
-  Apollo.RegisterEventHandler("ShowBank", "OnShowBank", self)
-  Apollo.RegisterEventHandler("ToggleAuctionWindow", "OnShowAuctionHouse", self)
-  Apollo.RegisterEventHandler("ToggleMarketplaceWindow", "OnShowCommoditiesExchange", self)
-  Apollo.RegisterEventHandler("InvokeVendorWindow", "OnShowVendor", self)
-  Apollo.RegisterEventHandler("MailBoxActivate","OnShowMailbox",self)
-  Apollo.RegisterEventHandler("GenericEvent_CraftingResume_OpenEngraving",  "OnShowEngravingStation", self)
-  Apollo.RegisterEventHandler("ToggleTradeskills",  "OnShowCraftingStation", self)
-  Apollo.RegisterEventHandler("GenericEvent_OpenToSpecificSchematic", "OnShowCraftingStation", self)
-  Apollo.RegisterEventHandler("GenericEvent_OpenToSpecificTechTree",   "OnShowCraftingStation", self)
-  Apollo.RegisterEventHandler("GenericEvent_OpenToSearchSchematic",   "OnShowCraftingStation", self)
-  Apollo.RegisterEventHandler("AlwaysShowTradeskills",   "OnShowCraftingStation", self)
+	Apollo.RegisterSlashCommand("ssc", "OnSlashCommand", self)
+	Apollo.RegisterEventHandler("SpaceStashCore_OpenOptions", "OnOpenOptions", self)
+	Apollo.RegisterEventHandler("ShowBank", "OnShowBank", self)
+	Apollo.RegisterEventHandler("ToggleAuctionWindow", "OnShowAuctionHouse", self)
+	Apollo.RegisterEventHandler("ToggleMarketplaceWindow", "OnShowCommoditiesExchange", self)
+	Apollo.RegisterEventHandler("InvokeVendorWindow", "OnShowVendor", self)
+	Apollo.RegisterEventHandler("MailBoxActivate","OnShowMailbox",self)
+	Apollo.RegisterEventHandler("GenericEvent_CraftingResume_OpenEngraving",  "OnShowEngravingStation", self)
+	Apollo.RegisterEventHandler("ToggleTradeskills",  "OnShowCraftingStation", self)
+	Apollo.RegisterEventHandler("GenericEvent_OpenToSpecificSchematic", "OnShowCraftingStation", self)
+	Apollo.RegisterEventHandler("GenericEvent_OpenToSpecificTechTree",   "OnShowCraftingStation", self)
+	Apollo.RegisterEventHandler("GenericEvent_OpenToSearchSchematic",   "OnShowCraftingStation", self)
+	Apollo.RegisterEventHandler("AlwaysShowTradeskills",   "OnShowCraftingStation", self)
 
-  self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashCore.xml")
-  self.xmlDoc:RegisterCallback("OnDocumentReady", self)
+	Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
+	Apollo.RegisterEventHandler("WindowManagementAdd", "OnRover", self)
+	
+	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashCore.xml")
+	self.xmlDoc:RegisterCallback("OnDocumentReady", self)
 end
 
-
-function SpaceStashCore:OnSpaceStashCoreReady()
-
-self.SSCAutoCS:SetCheck(self.db.profile.config.auto.inventory.craftingstation)
-self.SSCAutoSell:SetCheck(self.db.profile.config.auto.sell.active)
-self.SSCSellSavagable:SetCheck(self.db.profile.config.auto.sell.filters.Salvagables.active)
-self.SSCSellConsumables:SetCheck(self.db.profile.config.auto.sell.filters.Consumables.active)
-self.SSCSellAMP:SetCheck(self.db.profile.config.auto.sell.filters.AMP.active)
-self.SSCSellHousing:SetCheck(self.db.profile.config.auto.sell.filters.Housing.active)
-self.SSCSellCrafting:SetCheck(self.db.profile.config.auto.sell.filters.Crafting.active)
-self.SSCSellCostumes:SetCheck(self.db.profile.config.auto.sell.filters.Costumes.active)
-self.SSCSellSchematics:SetCheck(self.db.profile.config.auto.sell.filters.Schematics.active)
-self.SSCAutoRepair:SetCheck(self.db.profile.config.auto.repair)
-self.SSCAutoES:SetCheck(self.db.profile.config.auto.inventory.engravingstation)
-
-self.SSCAutoMailbox:SetCheck(self.db.profile.config.auto.inventory.mailbox)
-self.SSCAutoCE:SetCheck(self.db.profile.config.auto.inventory.commoditiesexchange)
-self.SSCAutoAH:SetCheck(self.db.profile.config.auto.inventory.auctionhouse)
-self.SSCAutoBank:SetCheck(self.db.profile.config.auto.inventory.bank)
-self.SSCAutoVendor:SetCheck(self.db.profile.config.auto.inventory.vendor)
-
-self.SellWhitelist:SetText(self.db.profile.config.auto.sell.whitelistRaw or "")
-self.SellBlacklist:SetText(self.db.profile.config.auto.sell.blacklistRaw or "")
-
-if self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Inferior then
-  self.SSCSellQualityChooserButton:FindChild("Choice1"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice1"):GetText())
-elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Average then
-  self.SSCSellQualityChooserButton:FindChild("Choice2"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice2"):GetText())
-elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Good then
-  self.SSCSellQualityChooserButton:FindChild("Choice3"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice3"):GetText())
-elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
-  self.SSCSellQualityChooserButton:FindChild("Choice4"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice4"):GetText())
-elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
-  self.SSCSellQualityChooserButton:FindChild("Choice5"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice5"):GetText())
-elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
-  self.SSCSellQualityChooserButton:FindChild("Choice6"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice6"):GetText())
-elseif self.db.profile.config.auto.sell.QualityTreshold == Item.CodeEnumItemQuality.Excellent then
-  self.SSCSellQualityChooserButton:FindChild("Choice7"):SetCheck(true)
-  self.SSCSellQualityChooserButton:SetText(self.SSCSellQualityChooserButton:FindChild("Choice7"):GetText())
+function SpaceStashCore:OnWindowManagementReady()
+	Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = "SpaceStashCore"})
 end
 
-if self.db.profile.config.auto.inventory.sort == 0 then
-  self.SSISortChooserButton:FindChild("Choice1"):SetCheck(true)
-  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice1"):GetText())
-elseif self.db.profile.config.auto.inventory.sort == 1 then
-  self.SSISortChooserButton:FindChild("Choice2"):SetCheck(true)
-  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice2"):GetText())
-elseif self.db.profile.config.auto.inventory.sort == 2 then
-  self.SSISortChooserButton:FindChild("Choice3"):SetCheck(true)
-  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice3"):GetText())
-elseif self.db.profile.config.auto.inventory.sort == 3 then
-  self.SSISortChooserButton:FindChild("Choice4"):SetCheck(true)
-  self.SSISortChooserButton:SetText(self.SSISortChooserButton:FindChild("Choice4"):GetText())
-end
-
-self:SetSortMehtod(self.db.profile.config.auto.inventory.sort)
-  GeminiLocale:TranslateWindow(L, self.wndMain)
-
-  Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashCore"})  
+function SpaceStashCore:OnRover(args)
+  if args.strName == "Rover" then
+    Event_FireGenericEvent("SendVarToRover", "SpaceStashCore", self)
+  end
 end
 
 function SpaceStashCore:OnSlashCommand(strCommand, strParam)
-  if strParam == "" then 
+	if strParam == "" then 
 
-    self.wndMain:Show(true,true)
-  elseif strParam == "info" then 
-    glog:info(self)
-  else
-
-  end
+	self.wndMain:Show(true,true)
+	elseif strParam == "info" then 
+		glog:info(self)
+	elseif strParam == "reset" then
+		self.db:ResetProfile()
+	end
 end
 
 function SpaceStashCore:OnOpenOptions( oHandler )
-  self.wndMain:Show(true,true)
+	self.wndMain:Show(true,true)
 
-  if oHandler == SpaceStashBank then
-    self.btnSSBOptions:SetCheck(true)
-    self:SpaceStashBankButtonCheck()
+	if oHandler == SpaceStashBank then
+		self.btnSSBOptions:SetCheck(true)
+		self:SpaceStashBankButtonCheck()
 
-    self.btnSSIOptions:SetCheck(false)
-    self.btnSSCOptions:SetCheck(false)
-    SpaceStashCore:SpaceStashCoreButtonUncheck()
-    SpaceStashCore:SpaceStashInventoryButtonUncheck()
-  elseif oHandler == SpaceStashInventory then
+		self.btnSSIOptions:SetCheck(false)
+		self.btnSSCOptions:SetCheck(false)
+		SpaceStashCore:SpaceStashCoreButtonUncheck()
+		SpaceStashCore:SpaceStashInventoryButtonUncheck()
+	elseif oHandler == SpaceStashInventory then
 
-    self.btnSSIOptions:SetCheck(true)
-    self:SpaceStashInventoryButtonCheck()
+		self.btnSSIOptions:SetCheck(true)
+		self:SpaceStashInventoryButtonCheck()
 
-    self.btnSSCOptions:SetCheck(false)
-    self.btnSSBOptions:SetCheck(false)
-    SpaceStashCore:SpaceStashCoreButtonUncheck()
-    SpaceStashCore:SpaceStashBankButtonUncheck()
-  else
-    self.btnSSCOptions:SetCheck(true)
-    self:SpaceStashCoreButtonCheck()
+		self.btnSSCOptions:SetCheck(false)
+		self.btnSSBOptions:SetCheck(false)
+		SpaceStashCore:SpaceStashCoreButtonUncheck()
+		SpaceStashCore:SpaceStashBankButtonUncheck()
+	else
+		self.btnSSCOptions:SetCheck(true)
+		self:SpaceStashCoreButtonCheck()
 
-    self.btnSSIOptions:SetCheck(false)
-    self.btnSSBOptions:SetCheck(false)
-    SpaceStashCore:SpaceStashInventoryButtonUncheck()
-    SpaceStashCore:SpaceStashBankButtonUncheck()
-  end
+		self.btnSSIOptions:SetCheck(false)
+		self.btnSSBOptions:SetCheck(false)
+		SpaceStashCore:SpaceStashInventoryButtonUncheck()
+		SpaceStashCore:SpaceStashBankButtonUncheck()
+	end
 end
 
 function SpaceStashCore:OnClose( ... )
@@ -299,80 +356,82 @@ end
 
 
 function SpaceStashCore:OnModuleButton(strType,strName)
-  if strType == "Check" then
-    if strName == "SpaceStashCoreButton" then
-      self:SpaceStashCoreButtonCheck()
-    elseif strName == "SpaceStashInventoryButton" then
-      self:SpaceStashInventoryButtonCheck()
-    elseif strName == "SpaceStashBankButton" then
-      self:SpaceStashBankButtonCheck()
-    end
-  else
-    if strName == "SpaceStashCore" then
-      self:SpaceStashCoreButtonUncheck()
-    elseif strName == "SpaceStashInventory" then
-      self:SpaceStashInventoryButtonUncheck()
-    elseif strName == "SpaceStashBankButton" then
-      self:SpaceStashBankButtonUncheck()
-    end
-  end
+	if strType == "Check" then
+		if strName == "SpaceStashCoreButton" then
+			self:SpaceStashCoreButtonCheck()
+		elseif strName == "SpaceStashInventoryButton" then
+			self:SpaceStashInventoryButtonCheck()
+		elseif strName == "SpaceStashBankButton" then
+			self:SpaceStashBankButtonCheck()
+		end
+	else
+		if strName == "SpaceStashCore" then
+			self:SpaceStashCoreButtonUncheck()
+		elseif strName == "SpaceStashInventory" then
+			self:SpaceStashInventoryButtonUncheck()
+		elseif strName == "SpaceStashBankButton" then
+			self:SpaceStashBankButtonUncheck()
+		end
+	end
 end
 
 function SpaceStashCore:SpaceStashCoreButtonCheck()
-  self.SSCOptionsFrame:Show(true)
-  self.targetFrame:TransitionPulse()
+	self.SSCOptionsFrame:Show(true)
+	self.targetFrame:TransitionPulse()
 end
 
 function SpaceStashCore:SpaceStashCoreButtonUncheck()
-  self.SSCOptionsFrame:Show(false)
-  self.targetFrame:TransitionPulse()
+	self.SSCOptionsFrame:Show(false)
+	self.targetFrame:TransitionPulse()
 end
 
 function SpaceStashCore:SpaceStashInventoryButtonCheck()
-  self.SSIOptionsFrame:Show(true)
-  self.targetFrame:TransitionPulse()
+	self.SSIOptionsFrame:Show(true)
+	self.targetFrame:TransitionPulse()
 end
 
 function SpaceStashCore:SpaceStashInventoryButtonUncheck()
-  self.SSIOptionsFrame:Show(false)
-  self.targetFrame:TransitionPulse()
+	self.SSIOptionsFrame:Show(false)
+	self.targetFrame:TransitionPulse()
 end
 
   
 function SpaceStashCore:SpaceStashBankButtonCheck()
-  self.SSBOptionsFrame:Show(true)
-  self.targetFrame:TransitionPulse()
+	self.SSBOptionsFrame:Show(true)
+	self.targetFrame:TransitionPulse()
 end
 
 
 function SpaceStashCore:SpaceStashBankButtonUncheck()
-  self.SSBOptionsFrame:Show(false)
-  self.targetFrame:TransitionPulse()
+	self.SSBOptionsFrame:Show(false)
+	self.targetFrame:TransitionPulse()
 end
 
 function SpaceStashCore:OnCurrencySelectionChange(wndHandler, wndControl, eMouseButton)
-  if wndHandler == self.SSIElderGemsButton then
-    SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems)
-  elseif wndHandler == self.SSIPrestigeButton then
-    SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.Prestige)
-  elseif wndHandler == self.SSIRenownButton then
-    SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.Renown)
-  elseif wndHandler == self.SSICraftingVouchersButton then
-    SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers)
-  end
+	if wndHandler == self.SSIElderGemsButton then
+		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems, self.SSIElderGemsButton:IsChecked())
+	elseif wndHandler == self.SSIPrestigeButton then
+		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.Prestige, self.SSIPrestigeButton:IsChecked())
+	elseif wndHandler == self.SSIRenownButton then
+		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.Renown, self.SSIRenownButton:IsChecked())
+	elseif wndHandler == self.SSICraftingVouchersButton then
+		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers, self.SSICraftingVouchersButton:IsChecked())
+	elseif wndHandler == self.SSICashButton then
+	    SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.Credits, self.SSICashButton:IsChecked())
+	end
 end
 
 function SpaceStashCore:UpdateTrackedCurrency()
-  local tracked = SpaceStashInventory:GetTrackedCurrency()
-  if tracked == Money.CodeEnumCurrencyType.ElderGems then
-    self.SSIElderGemsButton:SetCheck(true)
-  elseif tracked == Money.CodeEnumCurrencyType.Prestige then
-    self.SSIPrestigeButton:SetCheck(true)
-  elseif tracked == Money.CodeEnumCurrencyType.Renown then
-    self.SSIRenownButton:SetCheck(true)
-  elseif tracked == Money.CodeEnumCurrencyType.CraftingVouchers then
-    self.SSICraftingVouchersButton:SetCheck(true)
-  end
+	local tracked = SpaceStashInventory:GetTrackedCurrency()
+	if tracked == Money.CodeEnumCurrencyType.ElderGems then
+		self.SSIElderGemsButton:SetCheck(true)
+	elseif tracked == Money.CodeEnumCurrencyType.Prestige then
+		self.SSIPrestigeButton:SetCheck(true)
+	elseif tracked == Money.CodeEnumCurrencyType.Renown then
+		self.SSIRenownButton:SetCheck(true)
+	elseif tracked == Money.CodeEnumCurrencyType.CraftingVouchers then
+		self.SSICraftingVouchersButton:SetCheck(true)
+	end
 end
 
 function SpaceStashCore:OnInventoryIconsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
@@ -491,6 +550,14 @@ function SpaceStashCore:OnInventorySortChooserContainerClose()
   self.SSISortChooserButton:SetCheck(false)
 end
 
+function SpaceStashCore:OnBankSortToggle( wndHandler, wndControl )
+  self.SSBSortChooserButton:FindChild("ChoiceContainer"):Show(self.SSBSortChooserButton:IsChecked(),true)
+end
+
+function SpaceStashCore:OnBankSortChooserContainerClose()
+  self.SSBSortChooserButton:SetCheck(false)
+end
+
 local fnSortItemsByName = function(itemLeft, itemRight)
   if itemLeft == itemRight then
     return 0
@@ -593,17 +660,16 @@ function SpaceStashCore:OnInventorySortSelected(wndHandler, wndControl)
     self.SSISortChooserButton:SetText(wndHandler:GetText())
     self.SSISortChooserButton:FindChild("ChoiceContainer"):Show(false,true)
   end
+
   self:OnInventorySortChooserContainerClose()
 
   if SpaceStashInventory then
-    self:SetSortMehtod(self.db.profile.config.auto.inventory.sort)
+    self:SetInventorySortMehtod(self.db.profile.config.auto.inventory.sort)
   end
 end
 
-function SpaceStashCore:SetSortMehtod(nSortMethod)
-  self.db.profile.config.sort = nSortMethod
-
-
+function SpaceStashCore:SetInventorySortMehtod(nSortMethod)
+  self.db.profile.config.auto.inventory.sort = nSortMethod
 
   if nSortMethod == 1 then
     SpaceStashInventory:SetSortMehtod(fnSortItemsByName)
@@ -617,6 +683,50 @@ function SpaceStashCore:SetSortMehtod(nSortMethod)
   
 end
 
+
+function SpaceStashCore:OnBankSortSelected(wndHandler, wndControl)
+  if wndHandler == wndControl then
+    if wndHandler:GetName() == "Choice1" then
+      self.db.profile.config.auto.bank.sort = 0
+    elseif wndHandler:GetName() == "Choice2" then
+      self.db.profile.config.auto.bank.sort = 1
+    elseif wndHandler:GetName() == "Choice3" then
+      self.db.profile.config.auto.bank.sort = 2
+    elseif wndHandler:GetName() == "Choice4" then
+      self.db.profile.config.auto.bank.sort = 3
+    end
+    
+    self.SSBSortChooserButton:SetText(wndHandler:GetText())
+    self.SSBSortChooserButton:FindChild("ChoiceContainer"):Show(false,true)
+  end
+
+  self:OnBankSortChooserContainerClose()
+
+  if SpaceStashBank then
+    self:SetBankSortMehtod(self.db.profile.config.auto.bank.sort)
+  end
+end
+
+
+function SpaceStashCore:SetBankSortMehtod(nSortMethod)
+  self.db.profile.config.auto.bank.sort = nSortMethod
+
+  if nSortMethod == 1 then
+    SpaceStashBank:SetSortMehtod(fnSortItemsByName)
+  elseif nSortMethod == 2 then
+    SpaceStashBank:SetSortMehtod(fnSortItemsByQuality)
+  elseif nSortMethod == 3 then
+    SpaceStashBank:SetSortMehtod(fnSortItemsByCategory)
+  elseif nSortMethod == 0 then 
+    SpaceStashBank:SetSortMehtod()
+  end
+  
+end
+
+function SpaceStashCore:OnDisplayNewItemsChanged()
+  self.db.profile.config.DisplayNew = self.SSCNewItemDisplay:IsChecked()
+  SpaceStashInventory:SetDisplayNew(self.db.profile.config.DisplayNew)
+end
 
 function SpaceStashCore:OnSellQualityChooserToggle( wndHandler, wndControl )
   self.SSCSellQualityChooserButton:FindChild("ChoiceContainer"):Show(self.SSCSellQualityChooserButton:IsChecked(),true)
@@ -798,3 +908,4 @@ end
 function ItemFilterFamily_Costume(item)
   if item:GetItemFamily() == 26 then return true else return false end
 end 
+

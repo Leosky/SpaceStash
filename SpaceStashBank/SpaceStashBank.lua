@@ -1,7 +1,7 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashBank-Beta", 10
+local MAJOR, MINOR = "SpaceStashBank-Beta", 11
 
 
 
@@ -77,51 +77,52 @@ end
 local bDocumentCreated = false
 
 function SpaceStashBank:OnDocumentReady()
-  self.wndMain = Apollo.LoadForm(self.xmlDoc, "SpaceStashBankWindow", nil, self)
+	self.wndMain = Apollo.LoadForm(self.xmlDoc, "SpaceStashBankWindow", nil, self)
 
-  if self.wndMain == nil then
-    Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
-    return
-  end
-  
-  self.wndMain:Show(false)
-  self.wndContentFrame = self.wndMain:FindChild("Content")
-  self.wndPlayerMenu = self.wndMain:FindChild("BankPlayerMenu")
-  self.wndPlayerMenu:FindChild("OptionsButton"):SetTooltip(L["SSOPTIONS_TOOLTIP"])
-  self.wndTopFrame = self.wndMain:FindChild("TopFrame")
-   self.wndMenuFrame = self.wndTopFrame:FindChild("MenuFrame")
-   self.btnPlayerMenu = self.wndTopFrame:FindChild("PlayerMenuButton")
-   self.btnBankBagsTab = self.wndTopFrame:FindChild("ShowBankBagsTabButton")
-   self.btnClose = self.wndMenuFrame:FindChild("CloseButton")
-   self.wndBankBagsTabFrame = self.wndTopFrame:FindChild("BankBagsTabFrame")
-    self.wndBankBags = {
-      self.wndBankBagsTabFrame:FindChild("ItemWidget1"),
-      self.wndBankBagsTabFrame:FindChild("ItemWidget2"),
-      self.wndBankBagsTabFrame:FindChild("ItemWidget3"),
-      self.wndBankBagsTabFrame:FindChild("ItemWidget4"),
-      self.wndBankBagsTabFrame:FindChild("ItemWidget5")
-    }
+	if self.wndMain == nil then
+		Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
+		return
+	end
 
-  self.wndBankFrame = self.wndMain:FindChild("BankFrame")
-  self.wndBank = self.wndBankFrame:FindChild("BankWindow")
+	self.wndMain:Show(false)
+	self.wndContentFrame = self.wndMain:FindChild("Content")
+	self.wndPlayerMenu = self.wndMain:FindChild("BankPlayerMenu")
+	self.wndPlayerMenu:FindChild("OptionsButton"):SetTooltip(L["SSOPTIONS_TOOLTIP"])
+	self.wndTopFrame = self.wndMain:FindChild("TopFrame")
+	self.wndMenuFrame = self.wndTopFrame:FindChild("MenuFrame")
+	self.btnPlayerMenu = self.wndTopFrame:FindChild("PlayerMenuButton")
+	self.btnBankBagsTab = self.wndTopFrame:FindChild("ShowBankBagsTabButton")
+	self.btnClose = self.wndMenuFrame:FindChild("CloseButton")
+	self.wndBankBagsTabFrame = self.wndTopFrame:FindChild("BankBagsTabFrame")
+	self.wndBankBags = {
+		self.wndBankBagsTabFrame:FindChild("ItemWidget1"),
+		self.wndBankBagsTabFrame:FindChild("ItemWidget2"),
+		self.wndBankBagsTabFrame:FindChild("ItemWidget3"),
+		self.wndBankBagsTabFrame:FindChild("ItemWidget4"),
+		self.wndBankBagsTabFrame:FindChild("ItemWidget5")
+	}
 
-  self.wndBottomFrame = self.wndMain:FindChild("BottomFrame")
-    self.wndCash = self.wndMain:FindChild("CashWindow")
-    self.wndNextBankBagCost = self.wndMain:FindChild("BankBuyPrice")
+	self.wndBankFrame = self.wndMain:FindChild("BankFrame")
+	self.wndBank = self.wndBankFrame:FindChild("BankWindow")
 
-  self.xmlDoc = nil
+	self.wndBottomFrame = self.wndMain:FindChild("BottomFrame")
+	self.wndCash = self.wndMain:FindChild("CashWindow")
+	self.wndNextBankBagCost = self.wndMain:FindChild("BankBuyPrice")
 
-  self.bottomFrameHeight = self.wndBottomFrame:GetHeight()
-  self.wndCash:SetAmount(GameLib.GetPlayerCurrency(), true)
-  
-  self:UpdateBankBagSlots()
-  self:UpdateTabState()
-  self:OnIconSizeChange()
-  self:UpdateWindowSize()
+	self.xmlDoc = nil
 
-  GeminiLocale:TranslateWindow(L, self.wndMain)
-  self.wndNextBankBagCost:SetAmount(GameLib.GetNextBankBagCost():GetAmount(), true)
-  Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashBank"})  
+	self.bottomFrameHeight = self.wndBottomFrame:GetHeight()
+	self.wndCash:SetAmount(GameLib.GetPlayerCurrency(), true)
+
+	self:UpdateBankBagSlots()
+	self:UpdateTabState()
+	self:OnIconSizeChange()
+	self:UpdateWindowSize()
+
+	GeminiLocale:TranslateWindow(L, self.wndMain)
+	self.wndNextBankBagCost:SetAmount(GameLib.GetNextBankBagCost():GetAmount(), true)
+
+	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashBank"})  
 end
 
 -- Called when player has loaded and entered the world
@@ -134,7 +135,7 @@ function SpaceStashBank:OnEnable()
   Apollo.RegisterEventHandler("ShowBank", "OnShowBank", self)
 
   Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
-
+  Apollo.RegisterEventHandler("WindowManagementAdd", "OnRover", self)
   self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashBank.xml")
   self.xmlDoc:RegisterCallback("OnDocumentReady", self)
 end
@@ -142,6 +143,13 @@ end
 function SpaceStashBank:OnWindowManagementReady()
   Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = "SpaceStashBank"})
 end
+
+function SpaceStashBank:OnRover(args)
+  if args.strName == "Rover" then
+    Event_FireGenericEvent("SendVarToRover", "SpaceStashBank", self)
+  end
+end
+
 
 function SpaceStashBank:OnHideBank()
   self.wndMain:Show(false,true)
@@ -154,7 +162,7 @@ function SpaceStashBank:OnShowBank()
 end
 
 function SpaceStashBank:OnPlayerCurrencyChanged()
-  self.wndCash:SetAmount(GameLib.GetPlayerCurrency(), true)
+  if self.wndCash then self.wndCash:SetAmount(GameLib.GetPlayerCurrency(), true) end
 end
 
 function SpaceStashBank:OnSlashCommand(strCommand, strParam)
@@ -362,21 +370,31 @@ end
 -- SpaceStashBank Setters / Getters
 -----------------------------------------------------------------------------------------------
 function SpaceStashBank:SetIconsSize(nSize)
-  self.db.profile.config.IconSize = nSize
-  self:OnIconSizeChange()
-  self:UpdateWindowSize()
+	self.db.profile.config.IconSize = nSize
+	self:OnIconSizeChange()
+	self:UpdateWindowSize()
 end
 
 function SpaceStashBank:GetIconsSize()
-  return self.db.profile.config.IconSize
+	return self.db.profile.config.IconSize
 end
 
 function SpaceStashBank:SetRowsSize(nSize)
-  self.db.profile.config.RowSize = nSize
-  self:OnRowSizeChange()
-  self:UpdateWindowSize()
+	self.db.profile.config.RowSize = nSize
+	self:OnRowSizeChange()
+	self:UpdateWindowSize()
 end
 
 function SpaceStashBank:GetRowsSize()
-  return self.db.profile.config.RowSize
+	return self.db.profile.config.RowSize
+end
+
+function SpaceStashBank:SetSortMehtod(fSortMethod)
+	if not fSortMethod then 
+		self.wndBank:SetSort(false)
+		return
+	elseif type(fSortMethod) == "function" then
+		self.wndBank:SetSort(true)
+		self.wndBank:SetItemSortComparer(fSortMethod)
+	end
 end

@@ -43,18 +43,26 @@ L["SSCGR2OPT5"] = "Liste blanche (Objets toujours vendus)"
 L["SSCGR2OPT6"] = "Liste noire (Objets jamais vendus)"
 
 L["SSIOptions"] = "Inventaire"
-L["SSIGROUP1"] = "Devise alternative suivie"
+L["SSIGROUP1"] = "Devises suivies"
 L["SSIGR1OPT1"] = "Gemmes ancestrales"
 L["SSIGR1OPT2"] = "Prestige"
 L["SSIGR1OPT3"] = "Renommée"
 L["SSIGR1OPT4"] = "Coupons d'artisanat"
+L["SSIGR1OPT5"] = "Argent"
+
 L["SSIGROUP2"] = "Options visuelles"
 L["SSIGR2OPT1"] = "Taille des icônes"
 L["SSIGR2OPT2"] = "Taille des lignes"
 L["SSIORTGROUP"] = "Tri des sacs"
 L["SSISORTINVENTORY"] = "Méthode de tri de l'inventaire"
 
+L["SSIMISCGROUP"] = "Divers"
+L["SSIMISCGDISPLAYNEW"] = "Afficher les nouveaux objets (fermer l'inventaire les marques comme vus)"
+
 L["SSBOptions"] = "Banque"
 L["SSBGROUP1"] = "Options visuelles"
 L["SSBGR1OPT1"] = "Taille des icones"
 L["SSBGR1OPT2"] = "Taille des lignes"
+
+L['SSBSORTGROUP'] = "Tri de la banque"
+L['SSBSORTBANK'] = "Méthode de tri de la banque"

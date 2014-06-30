@@ -11,7 +11,8 @@
     <!-- localisation -->
     <Script Name="locales/enUS.lua"/>
     <Script Name="locales/frFR.lua"/>
-
+    <Script Name="locales/deDE.lua"/>
+    
     <Script Name="SpaceStashInventory.lua"/>
     <Form Name="SpaceStashInventory.xml"/>
     <ReplaceAddon Name="Inventory"/>

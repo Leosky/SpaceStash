@@ -43,18 +43,27 @@ L["SSCGR2OPT5"] = "Whitelist (Items always sold)"
 L["SSCGR2OPT6"] = "Blacklist (Items never sold)"
 
 L["SSIOptions"] = "Inventory"
-L["SSIGROUP1"] = "Alternative currency tracked"
+L["SSIGROUP1"] = "Tracked currencies"
+
 L["SSIGR1OPT1"] = "Elder Gems"
 L["SSIGR1OPT2"] = "Prestige"
 L["SSIGR1OPT3"] = "Renown"
 L["SSIGR1OPT4"] = "Crafting Vouchers"
+L["SSIGR1OPT5"] = "Money"
+
 L["SSIGROUP2"] = "Display options"
 L["SSIGR2OPT1"] = "Icons size"
 L["SSIGR2OPT2"] = "Row size"
 L["SSISORTGROUP"] = "Bags sorting"
 L["SSISORTINVENTORY"] = "Inventory sorting method"
 
+L["SSIMISCGROUP"] = "Misc"
+L["SSIMISCGDISPLAYNEW"] = "Display new items indicator (close inventory to mark items as viewed)"
+
 L["SSBOptions"] = "Bank"
 L["SSBGROUP1"] = "Display options"
 L["SSBGR1OPT1"] = "Icons size"
 L["SSBGR1OPT2"] = "Row size"
+
+L['SSBSORTGROUP'] = "Bank sorting"
+L['SSBSORTBANK'] = "Bank sorting method"

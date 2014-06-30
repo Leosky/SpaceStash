@@ -12,7 +12,7 @@
     <!-- localisation -->
     <Script Name="locales/frFR.lua"/>
     <Script Name="locales/enUS.lua"/>
-
+    <Script Name="locales/deDE.lua"/>
 
     <Form Name="SpaceStashBank.xml"/>
     <Script Name="SpaceStashBank.lua"/>

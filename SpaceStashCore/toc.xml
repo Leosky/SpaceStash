@@ -11,7 +11,8 @@
     <!-- localisation -->
     <Script Name="locales/enUS.lua"/>
     <Script Name="locales/frFR.lua"/>
-
+    <Script Name="locales/deDE.lua"/>
+    
     <Form Name="SpaceStashCore.xml"/>
     <Script Name="SpaceStashCore.lua"/>
 </Addon>
