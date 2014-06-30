@@ -1,3 +1,18 @@
 [submodule "SpaceStashBank/lib/LibError"]
 	path = SpaceStashBank/lib/LibError
 	url = git://github.com/wildstarnasa/LibError.git
+[submodule "SpaceStashBank/lib/GeminiAddon"]
+	path = SpaceStashBank/lib/GeminiAddon
+	url = git://github.com/wildstarnasa/GeminiAddon.git
+[submodule "SpaceStashBank/lib/GeminiDB"]
+	path = SpaceStashBank/lib/GeminiDB
+	url = git://github.com/wildstarnasa/GeminiDB.git
+[submodule "SpaceStashBank/lib/GeminiLogging"]
+	path = SpaceStashBank/lib/GeminiLogging
+	url = git://github.com/wildstarnasa/GeminiLogging.git
+[submodule "SpaceStashBank/lib/GeminiLocale"]
+	path = SpaceStashBank/lib/GeminiLocale
+	url = git://github.com/wildstarnasa/GeminiLocale.git
+[submodule "SpaceStashInventory/lib/LibError"]
+	path = SpaceStashInventory/lib/LibError
+	url = git://github.com/wildstarnasa/LibError.git
