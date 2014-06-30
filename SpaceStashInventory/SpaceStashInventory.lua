@@ -41,6 +41,8 @@ defaults.profile.version.MAJOR = MAJOR
 defaults.profile.version.MINOR = MINOR
 defaults.profile.config.IconSize = 36
 defaults.profile.config.RowSize = 10
+defaults.profile.config.CurrenciesMicroMenu = { anchors = {-207, -171, -6, -5} }
+defaults.profile.config.SplitWindow = { anchors = {0, 75, 164, 125} }
 defaults.profile.config.currencies = {}
 defaults.profile.config.currencies[Money.CodeEnumCurrencyType.Credits] = true
 defaults.profile.config.SelectedTab = Addon.CodeEnumTabDisplay.BagsTab
@@ -127,6 +129,8 @@ function Addon:OnDocumentReady()
 	self.buttonPlayerButton = self.wndMain:FindChild("PlayerButton")
 	self.wndPlayerMenuFrame = self.wndMain:FindChild("PlayerMenuFrame")
 
+	self.wndSplitWindow = self.wndMain:FindChild("SplitStackContainer")
+
 	self:SetSortMehtod(self.db.profile.config.sort)
 
 	if self.db.profile.config.SelectedTab == Addon.CodeEnumTabDisplay.BagsTab then
@@ -188,8 +192,15 @@ function Addon:OnDocumentReady()
 	Apollo.RegisterEventHandler("DragDropSysEnd", "OnSystemEndDragDrop", self)
 	Apollo.RegisterEventHandler("SplitItemStack", "OnSplitItemStack", self)
 
-	bDocumentCreated = true
+	self.wndCurrenciesMicroMenu:SetAnchorOffsets(self.db.profile.config.CurrenciesMicroMenu.anchors[1],
+		self.db.profile.config.CurrenciesMicroMenu.anchors[2],
+		self.db.profile.config.CurrenciesMicroMenu.anchors[3],
+		self.db.profile.config.CurrenciesMicroMenu.anchors[4])
 
+	self.wndSplitWindow:SetAnchorOffsets(self.db.profile.config.SplitWindow.anchors[1],
+		self.db.profile.config.SplitWindow.anchors[2],
+		self.db.profile.config.SplitWindow.anchors[3],
+		self.db.profile.config.SplitWindow.anchors[4])
 	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashInventory"})
 end
 
@@ -757,6 +768,10 @@ end
 
 function Addon:OnCurrenciesMicroMenuMove()
 	self.db.profile.config.CurrenciesMicroMenu.anchors = { self.wndCurrenciesMicroMenu:GetAnchorOffsets() }
+end
+
+function Addon:OnSplitWindowMove()
+	self.db.profile.config.SplitWindow.anchors = { self.wndSplitWindow:GetAnchorOffsets() }
 end
 
 function Addon:UpdateCashAmount()
