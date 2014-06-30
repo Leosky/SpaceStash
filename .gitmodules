@@ -1,0 +1,3 @@
+[submodule "SpaceStashBank/lib/LibError"]
+	path = SpaceStashBank/lib/LibError
+	url = git://github.com/wildstarnasa/LibError.git
