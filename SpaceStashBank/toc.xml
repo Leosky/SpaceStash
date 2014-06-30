@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Addon Author="Leosky" APIVersion="8" Name="SpaceStashBank" Description="">
     <!-- libs -->
+    <Script Name="lib/inspect.lua"/>
     <Script Name="lib/LibError/LibError-1.0.lua" />
-    <Script Name="lib/GeminiLogging/inspect.lua" />
     <Script Name="lib/GeminiLogging/GeminiLogging.lua" />
     <Script Name="lib/GeminiAddon/GeminiAddon.lua" />
     <Script Name="lib/GeminiDB/GeminiDB-1.0.lua" />
