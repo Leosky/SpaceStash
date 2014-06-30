@@ -137,18 +137,18 @@ function SpaceStashCore:OnDocumentReady()
 		return
 	end
 
-		self.SSIElderGemsButton = self.SSIOptionsFrame:FindChild("ElderGemsButton")
-		self.SSIPrestigeButton = self.SSIOptionsFrame:FindChild("PrestigeButton")
-		self.SSIRenownButton = self.SSIOptionsFrame:FindChild("RenownButton")
-		self.SSICraftingVouchersButton = self.SSIOptionsFrame:FindChild("CraftingVouchersButton")
-		self.SSICashButton = self.SSIOptionsFrame:FindChild("CashButton")
+	self.SSIElderGemsButton = self.SSIOptionsFrame:FindChild("ElderGemsButton")
+	self.SSIPrestigeButton = self.SSIOptionsFrame:FindChild("PrestigeButton")
+	self.SSIRenownButton = self.SSIOptionsFrame:FindChild("RenownButton")
+	self.SSICraftingVouchersButton = self.SSIOptionsFrame:FindChild("CraftingVouchersButton")
+	self.SSICashButton = self.SSIOptionsFrame:FindChild("CashButton")
 
-		self.SSIIconsSizeSlider = self.SSIOptionsFrame:FindChild("SSIIconsSizeSlider")
-		self.SSIIconsSizeText = self.SSIOptionsFrame:FindChild("SSIIconsSizeText")
-		self.SSIRowsSizeSlider = self.SSIOptionsFrame:FindChild("SSIRowsSizeSlider")
-		self.SSIRowsSizeText = self.SSIOptionsFrame:FindChild("SSIRowsSizeText")
-		self.SSISortChooserButton = self.SSIOptionsFrame:FindChild("SSISortChooserButton")
-		self.SSCNewItemDisplay = self.SSIOptionsFrame:FindChild("SSCNewItemDisplay")
+	self.SSIIconsSizeSlider = self.SSIOptionsFrame:FindChild("SSIIconsSizeSlider")
+	self.SSIIconsSizeText = self.SSIOptionsFrame:FindChild("SSIIconsSizeText")
+	self.SSIRowsSizeSlider = self.SSIOptionsFrame:FindChild("SSIRowsSizeSlider")
+	self.SSIRowsSizeText = self.SSIOptionsFrame:FindChild("SSIRowsSizeText")
+	self.SSISortChooserButton = self.SSIOptionsFrame:FindChild("SSISortChooserButton")
+	self.SSCNewItemDisplay = self.SSIOptionsFrame:FindChild("SSCNewItemDisplay")
 
 	--- SSB Options ---
 	self.SSBOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSBOptionsFrame", self.targetFrame, self)
@@ -263,6 +263,11 @@ function SpaceStashCore:OnDocumentReady()
 	if SpaceStashInventory then
 		self:SetInventorySortMehtod(self.db.profile.config.auto.inventory.sort)
 		SpaceStashInventory:SetDisplayNew(self.db.profile.config.DisplayNew)
+		self.SSIElderGemsButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems))
+		self.SSIPrestigeButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Prestige))
+		self.SSIRenownButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Renown))
+		self.SSICraftingVouchersButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers))
+		self.SSICashButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Credits))
 	end
 
 	if SpaceStashBank then
