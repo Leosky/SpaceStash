@@ -114,7 +114,6 @@ function SpaceStashBank:OnDocumentReady()
 	self.bottomFrameHeight = self.wndBottomFrame:GetHeight()
 	self.wndCash:SetAmount(GameLib.GetPlayerCurrency(), true)
 
-  self:OnRowSizeChange()
 	self:UpdateBankBagSlots()
 	self:UpdateTabState()
 	self:OnIconSizeChange()
