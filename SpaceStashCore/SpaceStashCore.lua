@@ -1,7 +1,7 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashCore-Beta", 11
+local MAJOR, MINOR = "SpaceStashCore-Beta", 12
 
 -----------------------------------------------------------------------------------------------
 -- Libraries
@@ -260,7 +260,9 @@ function SpaceStashCore:OnDocumentReady()
 
 	self.SSCNewItemDisplay:SetCheck(self.db.profile.config.DisplayNew)
 
-	if SpaceStashInventory then
+	Apollo.RegisterEventHandler("AddonFullyLoaded", "OnAddonReady", self)
+
+	if SpaceStashInventory and SpaceStashInventory.bReady then
 		self:SetInventorySortMehtod(self.db.profile.config.auto.inventory.sort)
 		SpaceStashInventory:SetDisplayNew(self.db.profile.config.DisplayNew)
 		self.SSIElderGemsButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems))
@@ -270,13 +272,27 @@ function SpaceStashCore:OnDocumentReady()
 		self.SSICashButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Credits))
 	end
 
-	if SpaceStashBank then
+	if SpaceStashBank and SpaceStashBank.bReady then
 		self:SetBankSortMehtod(self.db.profile.config.auto.bank.sort)
 	end
 	
 	GeminiLocale:TranslateWindow(L, self.wndMain)
 
 	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashCore"})
+end
+
+function SpaceStashCore:OnAddonReady(strAddon)
+	if strAddon == "SpaceStashBank" then
+		self:SetBankSortMehtod(self.db.profile.config.auto.bank.sort)
+	elseif strAddon == "SpaceStashInventory" then
+		self:SetInventorySortMehtod(self.db.profile.config.auto.inventory.sort)
+		SpaceStashInventory:SetDisplayNew(self.db.profile.config.DisplayNew)
+		self.SSIElderGemsButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems))
+		self.SSIPrestigeButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Prestige))
+		self.SSIRenownButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Renown))
+		self.SSICraftingVouchersButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers))
+		self.SSICashButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Credits))
+	end
 end
 
 -- Called when player has loaded and entered the world

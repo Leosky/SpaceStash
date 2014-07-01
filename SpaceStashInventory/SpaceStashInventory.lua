@@ -13,7 +13,7 @@ require "Sound"
 -----------------------------------------------------------------------------------------------
 -- Constants and Defaults parameters
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "SpaceStashInventory-Beta", 20
+local MAJOR, MINOR = "SpaceStashInventory-Beta", 21
 
 -----------------------------------------------------------------------------------------------
 -- Libraries
@@ -201,6 +201,9 @@ function Addon:OnDocumentReady()
 		self.db.profile.config.SplitWindow.anchors[2],
 		self.db.profile.config.SplitWindow.anchors[3],
 		self.db.profile.config.SplitWindow.anchors[4])
+
+	self.bReady = true
+
 	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashInventory"})
 end
 

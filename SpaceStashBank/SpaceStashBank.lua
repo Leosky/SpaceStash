@@ -1,7 +1,7 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashBank-Beta", 11
+local MAJOR, MINOR = "SpaceStashBank-Beta", 12
 
 
 
@@ -36,9 +36,6 @@ defaults.profile.config.SelectedTab = SpaceStashBank.CodeEnumTabDisplay.None
 function SpaceStashBank:OnInitialize()
 
   self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
-
-  
-
   glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
     level = "INFO",
     pattern = "%d [%c:%n] %l - %m",
@@ -74,7 +71,19 @@ function SpaceStashBank:OnInitialize()
   })
 end
 
-local bDocumentCreated = false
+function SpaceStashBank:OnEnable()
+  
+  Apollo.RegisterSlashCommand("ssb", "OnSlashCommand", self)
+  
+  Apollo.RegisterEventHandler("HideBank", "OnHideBank", self)
+  Apollo.RegisterEventHandler("ShowBank", "OnShowBank", self)
+
+  Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
+  Apollo.RegisterEventHandler("WindowManagementAdd", "OnRover", self)
+
+  self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashBank.xml")
+  self.xmlDoc:RegisterCallback("OnDocumentReady", self)
+end
 
 function SpaceStashBank:OnDocumentReady()
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "SpaceStashBankWindow", nil, self)
@@ -82,62 +91,54 @@ function SpaceStashBank:OnDocumentReady()
 	if self.wndMain == nil then
 		Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 		return
-	end
+	else
+		self.wndMain:Show(false)
+		self.wndContentFrame = self.wndMain:FindChild("Content")
+		self.wndPlayerMenu = self.wndMain:FindChild("BankPlayerMenu")
+		self.wndPlayerMenu:FindChild("OptionsButton"):SetTooltip(L["SSOPTIONS_TOOLTIP"])
+		self.wndTopFrame = self.wndMain:FindChild("TopFrame")
+		self.wndMenuFrame = self.wndTopFrame:FindChild("MenuFrame")
+		self.btnPlayerMenu = self.wndTopFrame:FindChild("PlayerMenuButton")
+		self.btnBankBagsTab = self.wndTopFrame:FindChild("ShowBankBagsTabButton")
+		self.btnClose = self.wndMenuFrame:FindChild("CloseButton")
+		self.wndBankBagsTabFrame = self.wndTopFrame:FindChild("BankBagsTabFrame")
 
-	self.wndMain:Show(false)
-	self.wndContentFrame = self.wndMain:FindChild("Content")
-	self.wndPlayerMenu = self.wndMain:FindChild("BankPlayerMenu")
-	self.wndPlayerMenu:FindChild("OptionsButton"):SetTooltip(L["SSOPTIONS_TOOLTIP"])
-	self.wndTopFrame = self.wndMain:FindChild("TopFrame")
-	self.wndMenuFrame = self.wndTopFrame:FindChild("MenuFrame")
-	self.btnPlayerMenu = self.wndTopFrame:FindChild("PlayerMenuButton")
-	self.btnBankBagsTab = self.wndTopFrame:FindChild("ShowBankBagsTabButton")
-	self.btnClose = self.wndMenuFrame:FindChild("CloseButton")
-	self.wndBankBagsTabFrame = self.wndTopFrame:FindChild("BankBagsTabFrame")
-	self.wndBankBags = {
-		self.wndBankBagsTabFrame:FindChild("ItemWidget1"),
-		self.wndBankBagsTabFrame:FindChild("ItemWidget2"),
-		self.wndBankBagsTabFrame:FindChild("ItemWidget3"),
-		self.wndBankBagsTabFrame:FindChild("ItemWidget4"),
-		self.wndBankBagsTabFrame:FindChild("ItemWidget5")
-	}
+		self.wndBankBags = {
+			self.wndBankBagsTabFrame:FindChild("ItemWidget1"),
+			self.wndBankBagsTabFrame:FindChild("ItemWidget2"),
+			self.wndBankBagsTabFrame:FindChild("ItemWidget3"),
+			self.wndBankBagsTabFrame:FindChild("ItemWidget4"),
+			self.wndBankBagsTabFrame:FindChild("ItemWidget5")
+		}
 
-	self.wndBankFrame = self.wndMain:FindChild("BankFrame")
-	self.wndBank = self.wndBankFrame:FindChild("BankWindow")
+		self.wndBankFrame = self.wndMain:FindChild("BankFrame")
+		self.wndBank = self.wndBankFrame:FindChild("BankWindow")
 
-	self.wndBottomFrame = self.wndMain:FindChild("BottomFrame")
-	self.wndCash = self.wndMain:FindChild("CashWindow")
-	self.wndNextBankBagCost = self.wndMain:FindChild("BankBuyPrice")
+		self.wndBottomFrame = self.wndMain:FindChild("BottomFrame")
+		self.wndCash = self.wndMain:FindChild("CashWindow")
+		self.wndNextBankBagCost = self.wndMain:FindChild("BankBuyPrice")
 
-	self.xmlDoc = nil
+		self.xmlDoc = nil
 
-	self.bottomFrameHeight = self.wndBottomFrame:GetHeight()
-	self.wndCash:SetAmount(GameLib.GetPlayerCurrency(), true)
+		self.bottomFrameHeight = self.wndBottomFrame:GetHeight()
+		self.wndCash:SetAmount(GameLib.GetPlayerCurrency(), true)
 
-	self:UpdateBankBagSlots()
-	self:UpdateTabState()
-	self:OnIconSizeChange()
-	self:UpdateWindowSize()
+		self:OnIconSizeChange()
+		self:UpdateBankBagSlots()
+		self:UpdateTabState()
 
-	GeminiLocale:TranslateWindow(L, self.wndMain)
-	self.wndNextBankBagCost:SetAmount(GameLib.GetNextBankBagCost():GetAmount(), true)
+		self:UpdateWindowSize()
 
-	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashBank"})  
-end
+		GeminiLocale:TranslateWindow(L, self.wndMain)
+		self.wndNextBankBagCost:SetAmount(GameLib.GetNextBankBagCost():GetAmount(), true)
 
--- Called when player has loaded and entered the world
-function SpaceStashBank:OnEnable()
-  
-  Apollo.RegisterSlashCommand("ssb", "OnSlashCommand", self)
-  Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "OnEquippedItemChanged", self)
-  Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
-  Apollo.RegisterEventHandler("HideBank", "OnHideBank", self)
-  Apollo.RegisterEventHandler("ShowBank", "OnShowBank", self)
+		Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "OnEquippedItemChanged", self)
+		Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
 
-  Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
-  Apollo.RegisterEventHandler("WindowManagementAdd", "OnRover", self)
-  self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashBank.xml")
-  self.xmlDoc:RegisterCallback("OnDocumentReady", self)
+		self.bReady = true
+
+		Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashBank"})  
+  end
 end
 
 function SpaceStashBank:OnWindowManagementReady()
@@ -150,7 +151,14 @@ function SpaceStashBank:OnRover(args)
   end
 end
 
+-----------------------------------------------------------------------------------------------
+-- Drawing 
+-----------------------------------------------------------------------------------------------
 
+
+-----------------------------------------------------------------------------------------------
+-- Events
+-----------------------------------------------------------------------------------------------
 function SpaceStashBank:OnHideBank()
   self.wndMain:Show(false,true)
 end
@@ -190,13 +198,13 @@ function SpaceStashBank:OnBankBagsTabChecked( wndHandler, wndControl, eMouseButt
   self:UpdateTabState()
 
   self:OnIconSizeChange()
-  self:UpdateWindowSize();
+  self:UpdateWindowSize()
 end
 
 function SpaceStashBank:OnBankBagsTabUnhecked( wndHandler, wndControl, eMouseButton )
   self.db.profile.config.SelectedTab = SpaceStashBank.CodeEnumTabDisplay.None
   self:UpdateTabState()
-  self:UpdateWindowSize();
+  self:UpdateWindowSize()
 end
 
 function SpaceStashBank:OnBankPlayerMenuChecked( wndHandler, wndControl, eMouseButton )
