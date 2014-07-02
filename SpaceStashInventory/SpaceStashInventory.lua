@@ -58,18 +58,22 @@ function Addon:OnInitialize()
 
   self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
 
-	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashInventory.xml")
-	self.xmlDoc:RegisterCallback("OnDocumentReady", self)
 
   glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
-      level = "INFO",
+      level = GeminiLogger.INFO,
       pattern = "%d [%c:%n] %l - %m",
-      appender = "Print"
+      appender = "GeminiConsole"
     })
 
 end
 
-local bDocumentCreated = false
+function Addon:OnEnable()
+ 	SpaceStashCore = Apollo.GetAddon("SpaceStashCore")
+	
+	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashInventory.xml")
+	self.xmlDoc:RegisterCallback("OnDocumentReady", self)
+
+end
 
 function Addon:OnDocumentReady()
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "SpaceStashInventoryForm", nil, self)
@@ -171,7 +175,7 @@ function Addon:OnDocumentReady()
 	Apollo.RegisterEventHandler("ToggleInventory", "OnVisibilityToggle", self)
 	Apollo.RegisterEventHandler("ShowInventory", "OnVisibilityToggle", self)
 
-	Apollo.RegisterSlashCommand("ssi", "OnSSCmd", self)
+	Apollo.RegisterSlashCommand("ssi", "OnSlashCommand", self)
 	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
 	Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
 	Apollo.RegisterEventHandler("WindowManagementAdd", "OnRover", self)
@@ -206,14 +210,6 @@ function Addon:OnDocumentReady()
 
 	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashInventory"})
 end
-
-
-function Addon:OnEnable()
-  SpaceStashCore = Apollo.GetAddon("SpaceStashCore")
-
-  if bDocumentCreated then self:Redraw() end
-end
-
 
 function Addon:OnInterfaceMenuListHasLoaded()
 	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", Apollo.GetString("InterfaceMenu_Inventory"), {"InterfaceMenu_ToggleInventory", "Inventory", ""})
@@ -314,12 +310,6 @@ function Addon:OnSplitStackConfirm(wndHandler, wndCtrl)
 	self.wndMain:FindChild("BagWindow"):StartSplitStack(tItem, wndSplit:FindChild("SplitValue"):GetValue())
 end
 
------------------------------------------------------------------------------------------------
--- Currencies Functions
------------------------------------------------------------------------------------------------
--- currency event fired
-
-
 function Addon:ResetConfig() 
 	self.db.profile.config = defaults
 	
@@ -330,11 +320,11 @@ end
 ---------------------------------------------------------------------------------------------------
 
 -- on /ssi console command
-function Addon:OnSSCmd(strCommand, strParam)
+function Addon:OnSlashCommand(strCommand, strParam)
 	if strParam == "" then 
 		self:OnVisibilityToggle()
 	elseif strParam == "info" then 
-		glog:info(self.db.profile.config)
+		glog:info(self)
 	elseif strParam == "redraw" then
 		self:Redraw()
 	end
@@ -816,7 +806,6 @@ end
 function Addon:OnShowBank()
 	Event_FireGenericEvent("ShowBank")
 end
-
 
 function Addon:SetSortMehtod(fSortMethod)
 	if not fSortMethod then 

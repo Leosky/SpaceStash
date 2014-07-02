@@ -1,7 +1,7 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashBank-Beta", 12
+local MAJOR, MINOR = "SpaceStashBank-Beta", 13
 
 
 
