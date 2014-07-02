@@ -60,7 +60,7 @@ function Addon:OnInitialize()
 
 
   glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
-      level = GeminiLogger.INFO,
+      level = "INFO",
       pattern = "%d [%c:%n] %l - %m",
       appender = "GeminiConsole"
     })
@@ -236,7 +236,7 @@ end
 
 function Addon:OnSystemEndDragDrop(strType, iData)
 	if not self.wndMain or not self.wndMain:IsValid() or not self.wndMain:FindChild("TrashIcon") or strType == "DDGuildBankItem" or strType == "DDWarPartyBankItem" or strType == "DDGuildBankItemSplitStack" then
-		return -- TODO Investigate if there are other types
+		return -- TODO Investigate if there are other types///
 	end
 
 	Sound.Play(Sound.PlayUI46PlaceVirtual)
