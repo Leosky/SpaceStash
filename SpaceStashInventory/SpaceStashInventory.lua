@@ -2,7 +2,7 @@
 -- Client Lua Script for SpaceStashInventory
 -- Copyright (c) NCsoft. All rights reserved
 -----------------------------------------------------------------------------------------------
- 
+
 require "Apollo"
 require "GameLib"
 require "Item"
@@ -28,8 +28,8 @@ local tItemSlotBGPixie = {loc = {fPoints = {0,0,1,10},nOffsets = {0,0,0,0},},str
 
 Addon.CodeEnumTabDisplay = {
   None = 0,
-  BagsTab = 1, 
-  VirtualItemsTab = 2, 
+  BagsTab = 1,
+  VirtualItemsTab = 2,
   TradeskillsBagTab = 3
 }
 
@@ -69,7 +69,7 @@ end
 
 function Addon:OnEnable()
  	SpaceStashCore = Apollo.GetAddon("SpaceStashCore")
-	
+
 	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashInventory.xml")
 	self.xmlDoc:RegisterCallback("OnDocumentReady", self)
 
@@ -196,6 +196,13 @@ function Addon:OnDocumentReady()
 	Apollo.RegisterEventHandler("DragDropSysEnd", "OnSystemEndDragDrop", self)
 	Apollo.RegisterEventHandler("SplitItemStack", "OnSplitItemStack", self)
 
+	--virtual inventory related
+	-- Apollo.RegisterEventHandler("PlayerPathMissionUpdate", "OnQuestObjectiveUpdated", self)
+	-- Apollo.RegisterEventHandler("QuestObjectiveUpdated", "OnQuestObjectiveUpdated", self)
+	-- Apollo.RegisterEventHandler("PlayerPathRefresh", "OnQuestObjectiveUpdated", self)
+	-- Apollo.RegisterEventHandler("QuestStateChanged", "OnQuestObjectiveUpdated", self)
+	-- Apollo.RegisterEventHandler("ChallengeUpdated", "OnChallengeUpdated", self)
+
 	self.wndCurrenciesMicroMenu:SetAnchorOffsets(self.db.profile.config.CurrenciesMicroMenu.anchors[1],
 		self.db.profile.config.CurrenciesMicroMenu.anchors[2],
 		self.db.profile.config.CurrenciesMicroMenu.anchors[3],
@@ -207,7 +214,7 @@ function Addon:OnDocumentReady()
 		self.db.profile.config.SplitWindow.anchors[4])
 
 	self.bReady = true
-
+	-- self:UpdateVirtualItemInventory()
 	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashInventory"})
 end
 
@@ -247,7 +254,7 @@ function Addon:OnDeleteCancel()
 	self.wndDeleteConfirm:Close()
 end
 
-function Addon:InvokeDeleteConfirmWindow(iData) 
+function Addon:InvokeDeleteConfirmWindow(iData)
 	local itemData = Item.GetItemFromInventoryLoc(iData)
 	if itemData and not itemData:CanDelete() then
 		return
@@ -310,34 +317,82 @@ function Addon:OnSplitStackConfirm(wndHandler, wndCtrl)
 	self.wndMain:FindChild("BagWindow"):StartSplitStack(tItem, wndSplit:FindChild("SplitValue"):GetValue())
 end
 
-function Addon:ResetConfig() 
+function Addon:ResetConfig()
 	self.db.profile.config = defaults
-	
+
 	self:OnPlayerButtonUncheck() --to be sure that the option window is corresponding
 end
+
 ---------------------------------------------------------------------------------------------------
--- SpaceStashInventory Commands 
+-- SpaceStashInventory Commands
+---------------------------------------------------------------------------------------------------
+function Addon:OnQuestObjectiveUpdated()
+	self:UpdateVirtualItemInventory()
+end
+
+function Addon:OnChallengeUpdated()
+	self:UpdateVirtualItemInventory()
+end
+
+function Addon:UpdateVirtualItemInventory()
+	local tVirtualItems = Item.GetVirtualItems()
+	local bThereAreItems = #tVirtualItems > 0
+
+	local wndVirtalItemsFrame = self.wndMain:FindChild("VirtualItemsTabFrame")
+	wndVirtalItemsFrame:SetData(#tVirtualItems)
+
+	if not bThereAreItems then
+
+	elseif wndVirtalItemsFrame:GetData() == 0 then
+
+	end
+
+	-- Draw items
+	wndVirtalItemsFrame:DestroyChildren()
+	local nOnGoingCount = 0
+	for key, tCurrItem in pairs(tVirtualItems) do
+		local wndCurr = Apollo.LoadForm(self.xmlDoc, "VirtualItem", wndVirtalItemsFrame, self)
+		if tCurrItem.nCount > 1 then
+			wndCurr:FindChild("_Count"):SetText(tCurrItem.nCount)
+		end
+		nOnGoingCount = nOnGoingCount + tCurrItem.nCount
+		wndCurr:FindChild("_Item"):SetSprite(tCurrItem.strIcon)
+		wndCurr:SetTooltip(string.format("<P Font=\"CRB_InterfaceSmall\">%s</P><P Font=\"CRB_InterfaceSmall\" TextColor=\"aaaaaaaa\">%s</P>", tCurrItem.strName, tCurrItem.strFlavor))
+	end
+	
+	-- Adjust heights
+	if not self.nQuestItemContainerHeight then
+		local nLeft, nTop, nRight, nBottom = wndVirtalItemsFrame:GetAnchorOffsets()
+		self.nQuestItemContainerHeight = nBottom - nTop
+	end
+
+	wndVirtalItemsFrame:SetAnchorOffsets(2,38,0,self.nQuestItemContainerHeight)
+
+	self:Redraw()
+end
+---------------------------------------------------------------------------------------------------
+-- SpaceStashInventory Commands
 ---------------------------------------------------------------------------------------------------
 
 -- on /ssi console command
 function Addon:OnSlashCommand(strCommand, strParam)
-	if strParam == "" then 
+	if strParam == "" then
 		self:OnVisibilityToggle()
-	elseif strParam == "info" then 
+	elseif strParam == "info" then
 		glog:info(self)
 	elseif strParam == "redraw" then
 		self:Redraw()
 	end
 end
 ---------------------------------------------------------------------------------------------------
--- SpaceStashInventoryForm 
+-- SpaceStashInventoryForm
 ---------------------------------------------------------------------------------------------------
 -- update the windows position in the config as the user move it to save position between sessions.
 function  Addon:OnWindowMove()
 	-- TODO: Check that the window is in the screen
 	-- TODO: add an option to keep the entire frame in screen
 
-	
+
 end
 
 
@@ -369,7 +424,7 @@ end
 function Addon:IconSizeChange(nNewValue)
 	nNewValue = nNewValue or self.db.profile.config.IconSize
 	self.db.profile.config.IconSize = nNewValue
-	self.wndMain:FindChild("BagWindow"):SetSquareSize(self.db.profile.config.IconSize, self.db.profile.config.IconSize) 
+	self.wndMain:FindChild("BagWindow"):SetSquareSize(self.db.profile.config.IconSize, self.db.profile.config.IconSize)
 	self.wndMain:FindChild("BagWindow"):SetBoxesPerRow(self.db.profile.config.RowSize) --necessary
 
 	self.wndBagsTabFrame:SetAnchorOffsets(1,self.wndMenuFrame:GetHeight(),0,self.wndMenuFrame:GetHeight() + self.db.profile.config.IconSize )
@@ -405,14 +460,14 @@ function Addon:OnInventoryDisplayChange()
 		self.BagArtWindow1:AddPixie(tItemSlotBGPixie)
 	else
 		self.BagArtWindow1:FindChild("Capacity"):SetText()
-		
+
 	end
 	if self.BagArtWindow2:FindChild("Bag"):GetItem() then
 		self.BagArtWindow2:FindChild("Capacity"):SetText(self.BagArtWindow2:FindChild("Bag"):GetItem():GetBagSlots())
 		self.BagArtWindow2:AddPixie(tItemSlotBGPixie)
 	else
 		self.BagArtWindow2:FindChild("Capacity"):SetText()
-		
+
 	end
 	if self.BagArtWindow3:FindChild("Bag"):GetItem() then
 		self.BagArtWindow3:FindChild("Capacity"):SetText(self.BagArtWindow3:FindChild("Bag"):GetItem():GetBagSlots())
@@ -436,7 +491,7 @@ function Addon:OnInventoryDisplayChange()
 		y,
 		x + nInventoryFrameWidth - self.leftOffset + self.rightOffset,
 		y + self.topFrameHeight + self.bottomFrameHeight + nInventoryFrameHeight - self.topOffset + self.bottomOffset + 4)
-	
+
 end
 
 -- when the Cancel button is clicked
@@ -454,7 +509,7 @@ function Addon:OnVisibilityToggle()
 	if self.wndMain:IsShown() then
 		self.wndMain:Show(false,true)
     self.wndBagWindow:MarkAllItemsAsSeen()
-		Sound.Play(Sound.PlayUIBagClose)				
+		Sound.Play(Sound.PlayUIBagClose)
 	else
 		self:OnInventoryDisplayChange()
 		self:UpdateCashAmount()
@@ -489,7 +544,7 @@ end
 function Addon:OnGenerateTooltip(wndControl, wndHandler, tType, item)
 	if wndControl ~= wndHandler then return end
 	wndControl:SetTooltipDoc(nil)
-	if item ~= nil then 
+	if item ~= nil then
 		local itemEquipped = item:GetEquippedItemForItemType()
 		Tooltip.GetItemTooltipForm(self, wndControl, item, {bPrimary = true, bSelling = false, itemCompare = itemEquipped})
 	end
@@ -548,7 +603,7 @@ function Addon:OnShowTradeskillsBagTab(wndHandler, wndControl, eMouseButton )
 		self.wndTopFrame:FindChild("ShowTradeskillsBagTabButton"):SetCheck(true)
 		self.wndTradeskillsBagTabFrame:Show(true)
 		self:Redraw()
-	end 
+	end
 end
 
 function Addon:OnTabUnshow(wndHandler, wndControl, eMouseButton )
@@ -563,7 +618,7 @@ function Addon:OnTabUnshow(wndHandler, wndControl, eMouseButton )
 	self.wndTradeskillsBagTabFrame:Show(false)
 
 	self:Redraw()
-end	
+end
 
 function Addon:OnPlayerButtonCheck( wndHandler, wndControl, eMouseButton )
 	self.wndPlayerMenuFrame:Show(true)
@@ -575,7 +630,7 @@ function Addon:OnPlayerButtonUncheck( wndHandler, wndControl, eMouseButton )
 end
 
 function Addon:UpdateBottomFrameSize()
-    if not self.wndCurrencies:IsShown() then 
+    if not self.wndCurrencies:IsShown() then
         self.wndBottomFrame:SetAnchorOffsets(0,-30,0,0)
     else
         self.wndBottomFrame:SetAnchorOffsets(0,math.min(-30, -self.wndCurrencies:GetHeight() -4),0,0)
@@ -679,7 +734,7 @@ function Addon:UpdateTrackedCurrencies()
         self.wndCash:SetAnchorOffsets(0,-20,0,0)
         self.CurrenciesContainer:SetAnchorOffsets(0,0,0,-20)
         self.wndCash:Show(true,true)
-    else 
+    else
         self.wndCash:SetAnchorOffsets(0,0,0,0)
         self.CurrenciesContainer:SetAnchorOffsets(0,0,0,0)
         self.wndCash:Show(false,true)
@@ -743,9 +798,9 @@ function Addon:UpdateTrackedCurrencies()
         self.CurrencyMenuButton:Show(false,true)
     end
 
-    
-    
-    self:UpdateBottomFrameSize()    
+
+
+    self:UpdateBottomFrameSize()
 end
 
 function Addon:OnCloseCurrenciesMicroMenu()
@@ -754,8 +809,8 @@ function Addon:OnCloseCurrenciesMicroMenu()
 end
 
 function Addon:OnPlayerCurrencyChanged()
-    if self.wndMain:IsShown() then 
-        self:UpdateCashAmount() 
+    if self.wndMain:IsShown() then
+        self:UpdateCashAmount()
      end
 end
 
@@ -779,7 +834,7 @@ function Addon:UpdateCashAmount()
     for k, v in pairs(tCurrenciesWindows) do
         v:SetAmount(GameLib.GetPlayerCurrency(k):GetAmount())
     end
-    
+
 end
 
 -----------------------------------------------------------------------------------------------
@@ -808,7 +863,7 @@ function Addon:OnShowBank()
 end
 
 function Addon:SetSortMehtod(fSortMethod)
-	if not fSortMethod then 
+	if not fSortMethod then
 		self.wndBagWindow:SetSort(false)
 		return
 	elseif type(fSortMethod) == "function" then

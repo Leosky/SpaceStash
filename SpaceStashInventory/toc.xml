@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="Leosky" APIVersion="8" Name="SpaceStashInventory" Description="">
+<Addon Author="Leosky" APIVersion="9" Name="SpaceStashInventory" Description="">
     <!-- libs -->
-    <Script Name="lib/inspect.lua"/>
     <Script Name="lib/LibError/LibError-1.0.lua"/>
     <Script Name="lib/GeminiLogging/GeminiLogging.lua"/>
     <Script Name="lib/GeminiAddon/GeminiAddon.lua"/>
     <Script Name="lib/GeminiDB/GeminiDB-1.0.lua" />
     <Script Name="lib/GeminiLocale/GeminiLocale.lua"/>
-    
+
     <!-- localisation -->
     <Script Name="locales/enUS.lua"/>
     <Script Name="locales/frFR.lua"/>
     <Script Name="locales/deDE.lua"/>
-    
+
     <Script Name="SpaceStashInventory.lua"/>
     <Form Name="SpaceStashInventory.xml"/>
     <ReplaceAddon Name="Inventory"/>
