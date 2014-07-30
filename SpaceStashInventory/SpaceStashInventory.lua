@@ -13,16 +13,14 @@ require "Sound"
 -----------------------------------------------------------------------------------------------
 -- Constants and Defaults parameters
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "SpaceStashInventory-Beta", 21
+local MAJOR, MINOR = "SpaceStashInventory", 22
 
 -----------------------------------------------------------------------------------------------
 -- Libraries
 -----------------------------------------------------------------------------------------------
 local GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
-local Addon, glog = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("SpaceStashInventory")
-local L = GeminiLocale:GetLocale("SpaceStashInventory", true)
-
-local SpaceStashCore
+local Addon, glog = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(MAJOR)
+local L = GeminiLocale:GetLocale(MAJOR, true)
 
 local tItemSlotBGPixie = {loc = {fPoints = {0,0,1,10},nOffsets = {0,0,0,0},},strSprite="WhiteFill", cr= "black",fRotation="0"}
 
@@ -48,6 +46,11 @@ defaults.profile.config.currencies[Money.CodeEnumCurrencyType.Credits] = true
 defaults.profile.config.SelectedTab = Addon.CodeEnumTabDisplay.BagsTab
 defaults.profile.config.DisplayNew = false
 
+local tThirdAddonsInfos = {
+	WindowManagement = { isReady = false , isInit = false },
+	SpaceStashCore = { isReady = false , isInit = false },
+}
+
 local tCurrenciesWindows = {}
 local nCurrenciesWindowsSize = 0
 
@@ -55,20 +58,29 @@ local nCurrenciesWindowsSize = 0
 -- Base Wildstar addon behaviours
 -----------------------------------------------------------------------------------------------
 function Addon:OnInitialize()
-
-  self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
-
-
-  glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
-      level = "INFO",
-      pattern = "%d [%c:%n] %l - %m",
-      appender = "GeminiConsole"
-    })
-
+	self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
+ 
+	self._ThirdAddonsInfos = tThirdAddonsInfos
+	self._tLoadingInfo = { 
+		GUI = { isReady = false },
+	}
+	glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
+		level = "INFO",
+		pattern = "%d [%c:%n] %l - %m",
+		appender = "GeminiConsole"
+	})
+	
+	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
+	Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
+	Apollo.RegisterEventHandler("WindowManagementAdd", "OnAddonFullyLoaded", self) --rover
+	Apollo.RegisterEventHandler("AddonFullyLoaded","OnAddonFullyLoaded", self) -- spacestash
+	Apollo.RegisterEventHandler("InterfaceMenu_ToggleInventory", "OnVisibilityToggle", self)
+	Apollo.RegisterSlashCommand("ssi", "OnSlashCommand", self)
+	
 end
 
 function Addon:OnEnable()
- 	SpaceStashCore = Apollo.GetAddon("SpaceStashCore")
+ 	self._ThirdAddonsInfos.SpaceStashCore.instance = Apollo.GetAddon("SpaceStashCore")
 
 	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashInventory.xml")
 	self.xmlDoc:RegisterCallback("OnDocumentReady", self)
@@ -78,8 +90,9 @@ end
 function Addon:OnDocumentReady()
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "SpaceStashInventoryForm", nil, self)
 	self.wndDeleteConfirm = Apollo.LoadForm(self.xmlDoc, "InventoryDeleteNotice", nil, self)
+	self.wndSalvageConfirm = Apollo.LoadForm(self.xmlDoc, "InventorySalvageNotice", nil, self)
 
-	if self.wndMain == nil or self.wndDeleteConfirm == nil then
+	if self.wndMain == nil or self.wndDeleteConfirm == nil or self.wndSalvageConfirm == nil 	then
 		Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 		return
 	end
@@ -175,18 +188,12 @@ function Addon:OnDocumentReady()
 	Apollo.RegisterEventHandler("ToggleInventory", "OnVisibilityToggle", self)
 	Apollo.RegisterEventHandler("ShowInventory", "OnVisibilityToggle", self)
 
-	Apollo.RegisterSlashCommand("ssi", "OnSlashCommand", self)
-	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
-	Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
-	Apollo.RegisterEventHandler("WindowManagementAdd", "OnRover", self)
-
+	
 	Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
 	Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "Redraw", self)
 
 	Apollo.RegisterEventHandler("GuildBank_ShowPersonalInventory", "OnVisibilityToggle", self)
-	Apollo.RegisterEventHandler("InterfaceMenu_ToggleInventory", "OnVisibilityToggle", self)
-
-
+	
 	Apollo.RegisterEventHandler("LootedItem","OnItemLoot", self)
 	Apollo.RegisterEventHandler("ItemAdded","OnItemLoot", self)
 	Apollo.RegisterEventHandler("CombatLogLoot","OnItemLoot", self)
@@ -213,38 +220,71 @@ function Addon:OnDocumentReady()
 		self.db.profile.config.SplitWindow.anchors[3],
 		self.db.profile.config.SplitWindow.anchors[4])
 
-	self.bReady = true
-	-- self:UpdateVirtualItemInventory()
-	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashInventory"})
+	self:FinalizeLoading();
+end
+
+function Addon:FinalizeLoading()
+	self._tLoadingInfo.GUI.isReady = true;
+	if self._ThirdAddonsInfos.WindowManagement.isReady and not self._ThirdAddonsInfos.WindowManagement.isInit then
+		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR})
+		self._ThirdAddonsInfos.WindowManagement.isInit = true
+	end
+ 
+	if self._ThirdAddonsInfos.SpaceStashCore.isReady and not self._ThirdAddonsInfos.SpaceStashCore.isInit then 
+		self:InitSpaceStashCore()
+	end
+	
+	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = MAJOR})
+end
+ 
+function Addon:OnWindowManagementReady()
+	self._ThirdAddonsInfos.WindowManagement.isReady = true
+	if self._tLoadingInfo.GUI.isReady then
+		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR})
+		self._ThirdAddonsInfos.WindowManagement.isInit = true
+	end
+ 
 end
 
 function Addon:OnInterfaceMenuListHasLoaded()
 	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", Apollo.GetString("InterfaceMenu_Inventory"), {"InterfaceMenu_ToggleInventory", "Inventory", ""})
 end
 
-function Addon:OnWindowManagementReady()
-	Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = "SpaceStashInventory"})
-end
-
-function Addon:OnRover(args)
+function Addon:OnAddonFullyLoaded(args)
 	if args.strName == "Rover" then
-		Event_FireGenericEvent("SendVarToRover", "SpaceStashInventory", self)
-        Event_FireGenericEvent("SendVarToRover", "tCurrenciesWindows", tCurrenciesWindows)
+		Event_FireGenericEvent("SendVarToRover", MAJOR, self)
+	elseif args.strName == "SpaceStashCore" then
+		self:InitSpaceStashCore()
 	end
 end
+
+function Addon:InitSpaceStashCore()
+	-- DO YOUR DEPENDENCY INIT STUFF HERE
+ 
+	self._ThirdAddonsInfos.SpaceStashCore.isInit = true
+end
+
 -----------------------------------------------------------------------------------------------
 -- Item Deleting (c) Carbine
 -----------------------------------------------------------------------------------------------
 function Addon:OnSystemBeginDragDrop(wndSource, strType, iData)
 	if strType ~= "DDBagItem" then return end
 
+	local item = self.wndBagWindow:GetItem(iData)
+
+	if item and item:CanSalvage() then
+		self.btnSalvage:SetData(true)
+	end
+
 	Sound.Play(Sound.PlayUI45LiftVirtual)
 end
 
 function Addon:OnSystemEndDragDrop(strType, iData)
-	if not self.wndMain or not self.wndMain:IsValid() or not self.wndMain:FindChild("TrashIcon") or strType == "DDGuildBankItem" or strType == "DDWarPartyBankItem" or strType == "DDGuildBankItemSplitStack" then
+	if not self.wndMain or not self.wndMain:IsValid() or not self.btnSalvage or strType == "DDGuildBankItem" or strType == "DDWarPartyBankItem" or strType == "DDGuildBankItemSplitStack" then
 		return -- TODO Investigate if there are other types///
 	end
+
+	self.btnSalvage:SetData(false)
 
 	Sound.Play(Sound.PlayUI46PlaceVirtual)
 end
@@ -288,6 +328,63 @@ function Addon:OnDragDropTrash(wndHandler, wndControl, nX, nY, wndSource, strTyp
 	end
 	return false
 end
+
+-----------------------------------------------------------------------------------------------
+-- Drag & Drop On Salvage button support
+-----------------------------------------------------------------------------------------------
+function Addon:OnDragDropSalvage(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
+	if strType == "DDBagItem" and self.btnSalvage:GetData() then
+		self:InvokeSalvageConfirmWindow(iData)
+	end
+	return false
+end
+
+function Addon:OnQueryDragDropSalvage(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
+	if strType == "DDBagItem" and self.btnSalvage:GetData() then
+		return Apollo.DragDropQueryResult.Accept
+	end
+	return Apollo.DragDropQueryResult.Ignore
+end
+
+function Addon:OnDragDropNotifySalvage(wndHandler, wndControl, bMe) -- TODO: We can probably replace this with a button mouse over state
+	if bMe and self.btnSalvage:GetData() then
+		--self.wndMain:FindChild("SalvageIcon"):SetSprite("CRB_Inventory:InvBtn_SalvageToggleFlyby")
+		--self.wndMain:FindChild("TextActionPrompt_Salvage"):Show(true)
+	elseif self.btnSalvage:GetData() then
+		--self.wndMain:FindChild("SalvageIcon"):SetSprite("CRB_Inventory:InvBtn_SalvageTogglePressed")
+		--self.wndMain:FindChild("TextActionPrompt_Salvage"):Show(false)
+	end
+end
+
+function Addon:InvokeDeleteConfirmWindow(iData)
+	local itemData = Item.GetItemFromInventoryLoc(iData)
+	if itemData and not itemData:CanDelete() then
+		return
+	end
+	self.wndDeleteConfirm:SetData(iData)
+	self.wndDeleteConfirm:Show(true)
+	self.wndDeleteConfirm:ToFront()
+	self.wndDeleteConfirm:FindChild("DeleteBtn"):SetActionData(GameLib.CodeEnumConfirmButtonType.DeleteItem, iData)
+	Sound.Play(Sound.PlayUI55ErrorVirtual)
+end
+
+function Addon:InvokeSalvageConfirmWindow(iData)
+	self.wndSalvageConfirm:SetData(iData)
+	self.wndSalvageConfirm:Show(true)
+	self.wndSalvageConfirm:ToFront()
+	self.wndSalvageConfirm:FindChild("SalvageBtn"):SetActionData(GameLib.CodeEnumConfirmButtonType.SalvageItem, iData)
+	Sound.Play(Sound.PlayUI55ErrorVirtual)
+end
+
+function Addon:OnSalvageConfirm()
+	self:OnSalvageCancel()
+end
+
+function Addon:OnSalvageCancel()
+	self.wndSalvageConfirm:SetData(nil)
+	self.wndSalvageConfirm:Close()
+end
+
 -----------------------------------------------------------------------------------------------
 -- Stack Splitting (c) Carbine
 -----------------------------------------------------------------------------------------------
@@ -506,9 +603,11 @@ function Addon:OnItemLoot()
 end
 
 function Addon:OnVisibilityToggle()
+	if not self._tLoadingInfo.GUI.isReady then return end
+
 	if self.wndMain:IsShown() then
 		self.wndMain:Show(false,true)
-    self.wndBagWindow:MarkAllItemsAsSeen()
+    	self.wndBagWindow:MarkAllItemsAsSeen()
 		Sound.Play(Sound.PlayUIBagClose)
 	else
 		self:OnInventoryDisplayChange()

@@ -79,11 +79,20 @@ function SpaceStashCore:OnInitialize()
 	self.filters.Costume = ItemFilterFamily_Costume
 	self.filters.Schematic = ItemFilterFamily_Schematic
 
+
+	self.loading= {
+		isReady = false,
+		isSpaceStashInventoryReady = false,
+		isSpaceStashBankReady = false,
+	}
+
 	glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
 		level = "INFO",
 		pattern = "%d [%c:%n] %l - %m",
-		appender = "Print"
+		appender = "GeminiConsole"
 	})
+
+	RegisterEventHandler("AddonFullyLoaded","OnAddonFullyLoaded", self)
 end
 
 function SpaceStashCore:OnConfigure()
@@ -171,17 +180,10 @@ function SpaceStashCore:OnDocumentReady()
 	if not SpaceStashInventory then
 		self.btnSSIOptions:Show(false)
 		self.btnSSBOptions:SetAnchorOffsets(0,32,0,64)
-	else
-		self:UpdateTrackedCurrency()
-		self:UpdateInventoryIconsSize()
-		self:UpdateInventoryRowsSize()
 	end
 
 	if not SpaceStashBank then
 		self.btnSSBOptions:Show(false)
-	else
-		self:UpdateBankRowsSize()
-		self:UpdateBankIconsSize()
 	end
 
 	self.SSCAutoCS:SetCheck(self.db.profile.config.auto.inventory.craftingstation)
@@ -259,40 +261,19 @@ function SpaceStashCore:OnDocumentReady()
 	end
 
 	self.SSCNewItemDisplay:SetCheck(self.db.profile.config.DisplayNew)
-
-	Apollo.RegisterEventHandler("AddonFullyLoaded", "OnAddonReady", self)
-
-	if SpaceStashInventory and SpaceStashInventory.bReady then
-		self:SetInventorySortMehtod(self.db.profile.config.auto.inventory.sort)
-		SpaceStashInventory:SetDisplayNew(self.db.profile.config.DisplayNew)
-		self.SSIElderGemsButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems))
-		self.SSIPrestigeButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Prestige))
-		self.SSIRenownButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Renown))
-		self.SSICraftingVouchersButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers))
-		self.SSICashButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Credits))
-	end
-
-	if SpaceStashBank and SpaceStashBank.bReady then
-		self:SetBankSortMehtod(self.db.profile.config.auto.bank.sort)
-	end
 	
 	GeminiLocale:TranslateWindow(L, self.wndMain)
 
-	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashCore"})
-end
+	self.loading.isReady = true;
 
-function SpaceStashCore:OnAddonReady(strAddon)
-	if strAddon == "SpaceStashBank" then
-		self:SetBankSortMehtod(self.db.profile.config.auto.bank.sort)
-	elseif strAddon == "SpaceStashInventory" then
-		self:SetInventorySortMehtod(self.db.profile.config.auto.inventory.sort)
-		SpaceStashInventory:SetDisplayNew(self.db.profile.config.DisplayNew)
-		self.SSIElderGemsButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems))
-		self.SSIPrestigeButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Prestige))
-		self.SSIRenownButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Renown))
-		self.SSICraftingVouchersButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers))
-		self.SSICashButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Credits))
+	if SpaceStashBank and self.loading.isSpaceStashBankReady then
+		self:UpdateSpaceStashBankParams()
 	end
+	if SpaceStashInventory and self.loading.isSpaceStashInventoryReady then
+		self:UpdateSpaceStashInventoryParams()
+	end
+
+	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashCore"})
 end
 
 -- Called when player has loaded and entered the world
@@ -323,10 +304,49 @@ function SpaceStashCore:OnWindowManagementReady()
 end
 
 function SpaceStashCore:OnRover(args)
-  if args.strName == "Rover" then
-    Event_FireGenericEvent("SendVarToRover", "SpaceStashCore", self)
-  end
+	if args.strName == "Rover" then
+		Event_FireGenericEvent("SendVarToRover", "SpaceStashCore", self)
+ 	end
 end
+
+function SpaceStashCore:OnAddonFullyLoaded(...)
+	glog:info("bla")
+
+	args = ...
+	if args.strName == "SpaceStashBank" then
+		if self.loading.isReady then 
+			self:UpdateSpaceStashBankParams()
+		else
+			self.loading.isSpaceStashBankReady = true;
+		end
+	elseif args.strName == "SpaceStashInventory" and self.loading.isReady then
+		if self.loading.isReady then 
+			self:UpdateSpaceStashInventoryParams()
+		else
+			self.loading.isSpaceStashInventoryReady = true;
+		end
+	end
+end
+
+function SpaceStashCore:UpdateSpaceStashBankParams()
+	self:SetBankSortMehtod(self.db.profile.config.auto.bank.sort)
+	self:UpdateBankRowsSize()
+	self:UpdateBankIconsSize()
+end
+
+function SpaceStashCore:UpdateSpaceStashInventoryParams()
+	self:SetInventorySortMehtod(self.db.profile.config.auto.inventory.sort)
+	SpaceStashInventory:SetDisplayNew(self.db.profile.config.DisplayNew)
+	self:UpdateTrackedCurrency()
+	self:UpdateInventoryIconsSize()
+	self:UpdateInventoryRowsSize()
+
+	self.SSIElderGemsButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems))
+	self.SSIPrestigeButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Prestige))
+	self.SSIRenownButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Renown))
+	self.SSICraftingVouchersButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers))
+	self.SSICashButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Credits))
+end	
 
 function SpaceStashCore:OnSlashCommand(strCommand, strParam)
 	if strParam == "" then 
@@ -438,7 +458,7 @@ function SpaceStashCore:OnCurrencySelectionChange(wndHandler, wndControl, eMouse
 	elseif wndHandler == self.SSICraftingVouchersButton then
 		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers, self.SSICraftingVouchersButton:IsChecked())
 	elseif wndHandler == self.SSICashButton then
-	    SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.Credits, self.SSICashButton:IsChecked())
+		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.Credits, self.SSICashButton:IsChecked())
 	end
 end
 
@@ -581,22 +601,22 @@ end
 
 local fnSortItemsByName = function(itemLeft, itemRight)
   if itemLeft == itemRight then
-    return 0
+	return 0
   end
   if itemLeft and itemRight == nil then
-    return -1
+	return -1
   end
   if itemLeft == nil and itemRight then
-    return 1
+	return 1
   end
   
   local strLeftName = itemLeft:GetName()
   local strRightName = itemRight:GetName()
   if strLeftName < strRightName then
-    return -1
+	return -1
   end
   if strLeftName > strRightName then
-    return 1
+	return 1
   end
   
   return 0
@@ -604,31 +624,31 @@ end
 
 local fnSortItemsByCategory = function(itemLeft, itemRight)
   if itemLeft == itemRight then
-    return 0
+	return 0
   end
   if itemLeft and itemRight == nil then
-    return -1
+	return -1
   end
   if itemLeft == nil and itemRight then
-    return 1
+	return 1
   end
   
   local strLeftName = itemLeft:GetItemCategoryName()
   local strRightName = itemRight:GetItemCategoryName()
   if strLeftName < strRightName then
-    return -1
+	return -1
   end
   if strLeftName > strRightName then
-    return 1
+	return 1
   end
   
   local strLeftName = itemLeft:GetName()
   local strRightName = itemRight:GetName()
   if strLeftName < strRightName then
-    return -1
+	return -1
   end
   if strLeftName > strRightName then
-    return 1
+	return 1
   end
   
   return 0
@@ -636,31 +656,31 @@ end
 
 local fnSortItemsByQuality = function(itemLeft, itemRight)
   if itemLeft == itemRight then
-    return 0
+	return 0
   end
   if itemLeft and itemRight == nil then
-    return -1
+	return -1
   end
   if itemLeft == nil and itemRight then
-    return 1
+	return 1
   end
   
   local eLeftQuality = itemLeft:GetItemQuality()
   local eRightQuality = itemRight:GetItemQuality()
   if eLeftQuality > eRightQuality then
-    return -1
+	return -1
   end
   if eLeftQuality < eRightQuality then
-    return 1
+	return 1
   end
   
   local strLeftName = itemLeft:GetName()
   local strRightName = itemRight:GetName()
   if strLeftName < strRightName then
-    return -1
+	return -1
   end
   if strLeftName > strRightName then
-    return 1
+	return 1
   end
   
   return 0
@@ -668,24 +688,24 @@ end
 
 function SpaceStashCore:OnInventorySortSelected(wndHandler, wndControl)
   if wndHandler == wndControl then
-    if wndHandler:GetName() == "Choice1" then
-      self.db.profile.config.auto.inventory.sort = 0
-    elseif wndHandler:GetName() == "Choice2" then
-      self.db.profile.config.auto.inventory.sort = 1
-    elseif wndHandler:GetName() == "Choice3" then
-      self.db.profile.config.auto.inventory.sort = 2
-    elseif wndHandler:GetName() == "Choice4" then
-      self.db.profile.config.auto.inventory.sort = 3
-    end
-    
-    self.SSISortChooserButton:SetText(wndHandler:GetText())
-    self.SSISortChooserButton:FindChild("ChoiceContainer"):Show(false,true)
+	if wndHandler:GetName() == "Choice1" then
+	  self.db.profile.config.auto.inventory.sort = 0
+	elseif wndHandler:GetName() == "Choice2" then
+	  self.db.profile.config.auto.inventory.sort = 1
+	elseif wndHandler:GetName() == "Choice3" then
+	  self.db.profile.config.auto.inventory.sort = 2
+	elseif wndHandler:GetName() == "Choice4" then
+	  self.db.profile.config.auto.inventory.sort = 3
+	end
+	
+	self.SSISortChooserButton:SetText(wndHandler:GetText())
+	self.SSISortChooserButton:FindChild("ChoiceContainer"):Show(false,true)
   end
 
   self:OnInventorySortChooserContainerClose()
 
   if SpaceStashInventory then
-    self:SetInventorySortMehtod(self.db.profile.config.auto.inventory.sort)
+	self:SetInventorySortMehtod(self.db.profile.config.auto.inventory.sort)
   end
 end
 
@@ -693,13 +713,13 @@ function SpaceStashCore:SetInventorySortMehtod(nSortMethod)
   self.db.profile.config.auto.inventory.sort = nSortMethod
 
   if nSortMethod == 1 then
-    SpaceStashInventory:SetSortMehtod(fnSortItemsByName)
+	SpaceStashInventory:SetSortMehtod(fnSortItemsByName)
   elseif nSortMethod == 2 then
-    SpaceStashInventory:SetSortMehtod(fnSortItemsByQuality)
+	SpaceStashInventory:SetSortMehtod(fnSortItemsByQuality)
   elseif nSortMethod == 3 then
-    SpaceStashInventory:SetSortMehtod(fnSortItemsByCategory)
+	SpaceStashInventory:SetSortMehtod(fnSortItemsByCategory)
   elseif nSortMethod == 0 then 
-    SpaceStashInventory:SetSortMehtod()
+	SpaceStashInventory:SetSortMehtod()
   end
   
 end
@@ -707,24 +727,24 @@ end
 
 function SpaceStashCore:OnBankSortSelected(wndHandler, wndControl)
   if wndHandler == wndControl then
-    if wndHandler:GetName() == "Choice1" then
-      self.db.profile.config.auto.bank.sort = 0
-    elseif wndHandler:GetName() == "Choice2" then
-      self.db.profile.config.auto.bank.sort = 1
-    elseif wndHandler:GetName() == "Choice3" then
-      self.db.profile.config.auto.bank.sort = 2
-    elseif wndHandler:GetName() == "Choice4" then
-      self.db.profile.config.auto.bank.sort = 3
-    end
-    
-    self.SSBSortChooserButton:SetText(wndHandler:GetText())
-    self.SSBSortChooserButton:FindChild("ChoiceContainer"):Show(false,true)
+	if wndHandler:GetName() == "Choice1" then
+	  self.db.profile.config.auto.bank.sort = 0
+	elseif wndHandler:GetName() == "Choice2" then
+	  self.db.profile.config.auto.bank.sort = 1
+	elseif wndHandler:GetName() == "Choice3" then
+	  self.db.profile.config.auto.bank.sort = 2
+	elseif wndHandler:GetName() == "Choice4" then
+	  self.db.profile.config.auto.bank.sort = 3
+	end
+	
+	self.SSBSortChooserButton:SetText(wndHandler:GetText())
+	self.SSBSortChooserButton:FindChild("ChoiceContainer"):Show(false,true)
   end
 
   self:OnBankSortChooserContainerClose()
 
   if SpaceStashBank then
-    self:SetBankSortMehtod(self.db.profile.config.auto.bank.sort)
+	self:SetBankSortMehtod(self.db.profile.config.auto.bank.sort)
   end
 end
 
@@ -733,13 +753,13 @@ function SpaceStashCore:SetBankSortMehtod(nSortMethod)
   self.db.profile.config.auto.bank.sort = nSortMethod
 
   if nSortMethod == 1 then
-    SpaceStashBank:SetSortMehtod(fnSortItemsByName)
+	SpaceStashBank:SetSortMehtod(fnSortItemsByName)
   elseif nSortMethod == 2 then
-    SpaceStashBank:SetSortMehtod(fnSortItemsByQuality)
+	SpaceStashBank:SetSortMehtod(fnSortItemsByQuality)
   elseif nSortMethod == 3 then
-    SpaceStashBank:SetSortMehtod(fnSortItemsByCategory)
+	SpaceStashBank:SetSortMehtod(fnSortItemsByCategory)
   elseif nSortMethod == 0 then 
-    SpaceStashBank:SetSortMehtod()
+	SpaceStashBank:SetSortMehtod()
   end
   
 end
@@ -759,24 +779,24 @@ end
 
 function SpaceStashCore:OnAutoSellQualitySelected(wndHandler, wndControl)
   if wndHandler == wndControl then
-    if wndHandler:GetName() == "Choice1" then
-      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Inferior
-    elseif wndHandler:GetName() == "Choice2" then
-      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Average
-    elseif wndHandler:GetName() == "Choice3" then
-      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Good
-    elseif wndHandler:GetName() == "Choice4" then
-      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Excellent
-    elseif wndHandler:GetName() == "Choice5" then
-      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Superb
-    elseif wndHandler:GetName() == "Choice6" then
-      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Legendary
-    elseif wndHandler:GetName() == "Choice7" then
-      self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Artifact
-    end
-    
-    self.SSCSellQualityChooserButton:SetText(wndHandler:GetText())
-    self.SSCSellQualityChooserButton:FindChild("ChoiceContainer"):Show(false,true)
+	if wndHandler:GetName() == "Choice1" then
+	  self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Inferior
+	elseif wndHandler:GetName() == "Choice2" then
+	  self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Average
+	elseif wndHandler:GetName() == "Choice3" then
+	  self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Good
+	elseif wndHandler:GetName() == "Choice4" then
+	  self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Excellent
+	elseif wndHandler:GetName() == "Choice5" then
+	  self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Superb
+	elseif wndHandler:GetName() == "Choice6" then
+	  self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Legendary
+	elseif wndHandler:GetName() == "Choice7" then
+	  self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Artifact
+	end
+	
+	self.SSCSellQualityChooserButton:SetText(wndHandler:GetText())
+	self.SSCSellQualityChooserButton:FindChild("ChoiceContainer"):Show(false,true)
   end
   self:OnSellQualityChooserContainerClose()
 end
@@ -786,26 +806,26 @@ end
 --------------------------------------------------------------------------------------
 function SpaceStashCore:OnShowVendor() 
   if self.db.profile.config.auto.inventory.vendor then 
-    SpaceStashInventory:OpenInventory()
+	SpaceStashInventory:OpenInventory()
   end
 
   if self.db.profile.config.auto.sell.active then
-    self:SellItems()
+	self:SellItems()
   end
 
   if self.db.profile.config.auto.repair then
-    RepairAllItemsVendor()
+	RepairAllItemsVendor()
   end
   
 end
 
 function SpaceStashCore:SellItems()
   for _, item in ipairs(GameLib.GetPlayerUnit():GetInventoryItems()) do
-    if self.stringInArray(item.itemInBag:GetName(),self.db.profile.config.auto.sell.whitelist) and item.itemInBag:GetSellPrice() then
-      SellItemToVendorById(item.itemInBag:GetInventoryId(), item.itemInBag:GetStackCount())
-    elseif (not self.stringInArray(item.itemInBag:GetName(),self.db.profile.config.auto.sell.blacklist)) and item.itemInBag:GetItemQuality() <= self.db.profile.config.auto.sell.QualityTreshold and self:FilterItem(item.itemInBag) and item.itemInBag:GetSellPrice() then
-    	SellItemToVendorById(item.itemInBag:GetInventoryId(), item.itemInBag:GetStackCount())
-    end
+	if self.stringInArray(item.itemInBag:GetName(),self.db.profile.config.auto.sell.whitelist) and item.itemInBag:GetSellPrice() then
+	  SellItemToVendorById(item.itemInBag:GetInventoryId(), item.itemInBag:GetStackCount())
+	elseif (not self.stringInArray(item.itemInBag:GetName(),self.db.profile.config.auto.sell.blacklist)) and item.itemInBag:GetItemQuality() <= self.db.profile.config.auto.sell.QualityTreshold and self:FilterItem(item.itemInBag) and item.itemInBag:GetSellPrice() then
+		SellItemToVendorById(item.itemInBag:GetInventoryId(), item.itemInBag:GetStackCount())
+	end
   end
 end
 
