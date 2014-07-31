@@ -1,18 +1,18 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashCore-Beta", 12
+local MAJOR, MINOR = "SpaceStashCore", 13
 
 -----------------------------------------------------------------------------------------------
 -- Libraries
 -----------------------------------------------------------------------------------------------
 local GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
-local SpaceStashCore, glog, LibError = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("SpaceStashCore","SpaceStash")
-local L = GeminiLocale:GetLocale("SpaceStashCore", true)
+local Addon, glog, LibError = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(MAJOR,"SpaceStash")
+local L = GeminiLocale:GetLocale(MAJOR, true)
 
 local SpaceStashInventory, SpaceStashBank
 
-SpaceStashCore.CodeEnumItemFilter = {
+Addon.CodeEnumItemFilter = {
 	[1] = "Salvagable",
 	[2] = "Consumable",
 	[3] = "Housing",
@@ -58,32 +58,32 @@ defaults.profile.config.auto.sell.filters.Schematics = { active = false, filter 
 defaults.profile.config.auto.sell.QualityTreshold = 1
 defaults.profile.config.DisplayNew = true
 
+local _tLoadingInfo = {
+	WindowManagement = { isReady = false , isInit = false },
+	SpaceStashInventory = { isReady = false , isInit = false },
+	SpaceStashBank = { isReady = false , isInit = false },
+	GUI = { isReady = false, isInit = false },
+}
+
 -- Replaces MyAddon:OnLoad
-function SpaceStashCore:OnInitialize()
+function Addon:OnInitialize()
 
 	self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
 
-	GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
-	inspect = Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
-	L = GeminiLocale:GetLocale("SpaceStashCore", true)
+	GeminiLogging = _G.Apollo.GetPackage("Gemini:Logging-1.2").tPackage
+	inspect = _G.Apollo.GetPackage("Drafto:Lib:inspect-1.2").tPackage
+	L = GeminiLocale:GetLocale(MAJOR, true)
 
-	SpaceStashInventory = Apollo.GetAddon("SpaceStashInventory")
-	SpaceStashBank = Apollo.GetAddon("SpaceStashBank")
+	self._tLoadingInfo = _tLoadingInfo
 
-	self.filters = {}
-	self.filters.Salvagable = ItemFilterProperty_Salvagable
-	self.filters.Consumable = ItemFilterFamily_Consumable
-	self.filters.Housing = ItemFilterFamily_Housing
-	self.filters.Crafting = ItemFilterFamily_Crafting
-	self.filters.AMP = ItemFilterFamily_AMP
-	self.filters.Costume = ItemFilterFamily_Costume
-	self.filters.Schematic = ItemFilterFamily_Schematic
-
-
-	self.loading= {
-		isReady = false,
-		isSpaceStashInventoryReady = false,
-		isSpaceStashBankReady = false,
+	self.filters = {
+		Salvagable = ItemFilterProperty_Salvagable,
+		Consumable = ItemFilterFamily_Consumable,
+		Housing = ItemFilterFamily_Housing,
+		Crafting = ItemFilterFamily_Crafting,
+		AMP = ItemFilterFamily_AMP,
+		Costume = ItemFilterFamily_Costume,
+		Schematic = ItemFilterFamily_Schematic,
 	}
 
 	glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
@@ -92,14 +92,40 @@ function SpaceStashCore:OnInitialize()
 		appender = "GeminiConsole"
 	})
 
-	RegisterEventHandler("AddonFullyLoaded","OnAddonFullyLoaded", self)
+	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
+	Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
+	Apollo.RegisterEventHandler("WindowManagementAdd", "OnAddonFullyLoaded", self) --rover
+	Apollo.RegisterEventHandler("AddonFullyLoaded","OnAddonFullyLoaded", self) -- spacestash
+	Apollo.RegisterSlashCommand("ssc", "OnSlashCommand", self)
 end
 
-function SpaceStashCore:OnConfigure()
-	Event_FireGenericEvent("SpaceStashCore_OpenOptions", self)
+
+-- Called when player has loaded and entered the world
+function Addon:OnEnable()
+	self._tLoadingInfo.SpaceStashInventory.instance = Apollo.GetAddon("SpaceStashInventory")
+	SpaceStashInventory = self._tLoadingInfo.SpaceStashInventory.instance
+
+	self._tLoadingInfo.SpaceStashBank.instance = Apollo.GetAddon("SpaceStashBank")
+	SpaceStashBank = self._tLoadingInfo.SpaceStashBank.instance
+	
+	Apollo.RegisterEventHandler("SpaceStashCore_OpenOptions", "OnOpenOptions", self)
+	Apollo.RegisterEventHandler("ShowBank", "OnShowBank", self)
+	Apollo.RegisterEventHandler("ToggleAuctionWindow", "OnShowAuctionHouse", self)
+	Apollo.RegisterEventHandler("ToggleMarketplaceWindow", "OnShowCommoditiesExchange", self)
+	Apollo.RegisterEventHandler("InvokeVendorWindow", "OnShowVendor", self)
+	Apollo.RegisterEventHandler("MailBoxActivate","OnShowMailbox",self)
+	Apollo.RegisterEventHandler("GenericEvent_CraftingResume_OpenEngraving",  "OnShowEngravingStation", self)
+	Apollo.RegisterEventHandler("ToggleTradeskills",  "OnShowCraftingStation", self)
+	Apollo.RegisterEventHandler("GenericEvent_OpenToSpecificSchematic", "OnShowCraftingStation", self)
+	Apollo.RegisterEventHandler("GenericEvent_OpenToSpecificTechTree",   "OnShowCraftingStation", self)
+	Apollo.RegisterEventHandler("GenericEvent_OpenToSearchSchematic",   "OnShowCraftingStation", self)
+	Apollo.RegisterEventHandler("AlwaysShowTradeskills",   "OnShowCraftingStation", self)
+
+	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashCore.xml")
+	self.xmlDoc:RegisterCallback("OnDocumentReady", self)
 end
 
-function SpaceStashCore:OnDocumentReady()
+function Addon:OnDocumentReady()
 
 	self.wndMain = Apollo.LoadForm(self.xmlDoc, "SpaceStashCoreForm", nil, self)
 	self.targetFrame = self.wndMain:FindChild("TargetFrame")
@@ -141,11 +167,7 @@ function SpaceStashCore:OnDocumentReady()
 	-----SSI OPtions -----
 	self.SSIOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSIOptionsFrame", self.targetFrame, self)
 
-	if self.SSIOptionsFrame == nil and SpaceStashInventory then
-		Apollo.AddAddonErrorText(self, "Could not load SSIOptionsFrame for some reason.")
-		return
-	end
-
+	
 	self.SSIElderGemsButton = self.SSIOptionsFrame:FindChild("ElderGemsButton")
 	self.SSIPrestigeButton = self.SSIOptionsFrame:FindChild("PrestigeButton")
 	self.SSIRenownButton = self.SSIOptionsFrame:FindChild("RenownButton")
@@ -162,11 +184,7 @@ function SpaceStashCore:OnDocumentReady()
 	--- SSB Options ---
 	self.SSBOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSBOptionsFrame", self.targetFrame, self)
 
-	if self.SSBOptionsFrame == nil and SpaceStashBank then
-		Apollo.AddAddonErrorText(self, "Could not load SSBOptionsFrame	 for some reason.")
-		return
-	end
-
+	
 	self.SSBIconsSizeSlider = self.SSBOptionsFrame:FindChild("SSBIconsSizeSlider")
 	self.SSBIconsSizeText = self.SSBOptionsFrame:FindChild("SSBIconsSizeText")
 	self.SSBRowsSizeSlider = self.SSBOptionsFrame:FindChild("SSBRowsSizeSlider")
@@ -177,13 +195,14 @@ function SpaceStashCore:OnDocumentReady()
 	self.btnSSBOptions = self.wndMain:FindChild("SSBOptionsButton")
 	self.btnSSIOptions = self.wndMain:FindChild("SSIOptionsButton")
 
-	if not SpaceStashInventory then
-		self.btnSSIOptions:Show(false)
+	--todo change to use new soft dependency loading
+	if not SpaceStashInventory then 
+		self.btnSSIOptions:Show(false,true)
 		self.btnSSBOptions:SetAnchorOffsets(0,32,0,64)
 	end
 
 	if not SpaceStashBank then
-		self.btnSSBOptions:Show(false)
+		self.btnSSBOptions:Show(false,true)
 	end
 
 	self.SSCAutoCS:SetCheck(self.db.profile.config.auto.inventory.craftingstation)
@@ -264,77 +283,77 @@ function SpaceStashCore:OnDocumentReady()
 	
 	GeminiLocale:TranslateWindow(L, self.wndMain)
 
-	self.loading.isReady = true;
-
-	if SpaceStashBank and self.loading.isSpaceStashBankReady then
-		self:UpdateSpaceStashBankParams()
-	end
-	if SpaceStashInventory and self.loading.isSpaceStashInventoryReady then
-		self:UpdateSpaceStashInventoryParams()
-	end
-
-	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = "SpaceStashCore"})
+	self:FinalizeLoading();
 end
 
--- Called when player has loaded and entered the world
-function SpaceStashCore:OnEnable()
-	Apollo.RegisterSlashCommand("ssc", "OnSlashCommand", self)
-	Apollo.RegisterEventHandler("SpaceStashCore_OpenOptions", "OnOpenOptions", self)
-	Apollo.RegisterEventHandler("ShowBank", "OnShowBank", self)
-	Apollo.RegisterEventHandler("ToggleAuctionWindow", "OnShowAuctionHouse", self)
-	Apollo.RegisterEventHandler("ToggleMarketplaceWindow", "OnShowCommoditiesExchange", self)
-	Apollo.RegisterEventHandler("InvokeVendorWindow", "OnShowVendor", self)
-	Apollo.RegisterEventHandler("MailBoxActivate","OnShowMailbox",self)
-	Apollo.RegisterEventHandler("GenericEvent_CraftingResume_OpenEngraving",  "OnShowEngravingStation", self)
-	Apollo.RegisterEventHandler("ToggleTradeskills",  "OnShowCraftingStation", self)
-	Apollo.RegisterEventHandler("GenericEvent_OpenToSpecificSchematic", "OnShowCraftingStation", self)
-	Apollo.RegisterEventHandler("GenericEvent_OpenToSpecificTechTree",   "OnShowCraftingStation", self)
-	Apollo.RegisterEventHandler("GenericEvent_OpenToSearchSchematic",   "OnShowCraftingStation", self)
-	Apollo.RegisterEventHandler("AlwaysShowTradeskills",   "OnShowCraftingStation", self)
+function Addon:FinalizeLoading()
+	self._tLoadingInfo.GUI.isReady = true;
 
-	Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
-	Apollo.RegisterEventHandler("WindowManagementAdd", "OnRover", self)
+	if self._tLoadingInfo.WindowManagement.isReady then
+		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR})
+		self._tLoadingInfo.WindowManagement.isInit = true
+	end
+ 
+	if self._tLoadingInfo.SpaceStashInventory.isReady then 
+		self:InitSpaceStashInventory()
+	end
 	
-	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashCore.xml")
-	self.xmlDoc:RegisterCallback("OnDocumentReady", self)
+	if self._tLoadingInfo.SpaceStashBank.isReady then 
+		self:InitSpaceStashBank()
+	end
+
+	self._tLoadingInfo.GUI.isInit = true
+	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = MAJOR})
 end
 
-function SpaceStashCore:OnWindowManagementReady()
-	Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = "SpaceStashCore"})
+function Addon:OnWindowManagementReady()
+	self._tLoadingInfo.WindowManagement.isReady = true
+	if self._tLoadingInfo.GUI.isReady then
+		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR})
+		self._tLoadingInfo.WindowManagement.isInit = true
+	end
+ 
 end
 
-function SpaceStashCore:OnRover(args)
+function Addon:OnAddonFullyLoaded(args)
 	if args.strName == "Rover" then
-		Event_FireGenericEvent("SendVarToRover", "SpaceStashCore", self)
+		Event_FireGenericEvent("SendVarToRover", MAJOR, self)
+ 	elseif args.strName == "SpaceStashInventory" then
+		self._tLoadingInfo.SpaceStashInventory.isReady = true
+		self:InitSpaceStashInventory()
+ 	elseif args.strName == "SpaceStashBank" then
+ 		self._tLoadingInfo.SpaceStashBank.isReady = true
+		self:InitSpaceStashBank()
  	end
 end
 
-function SpaceStashCore:OnAddonFullyLoaded(...)
-	glog:info("bla")
-
-	args = ...
-	if args.strName == "SpaceStashBank" then
-		if self.loading.isReady then 
-			self:UpdateSpaceStashBankParams()
-		else
-			self.loading.isSpaceStashBankReady = true;
-		end
-	elseif args.strName == "SpaceStashInventory" and self.loading.isReady then
-		if self.loading.isReady then 
-			self:UpdateSpaceStashInventoryParams()
-		else
-			self.loading.isSpaceStashInventoryReady = true;
-		end
-	end
+function Addon:OnConfigure()
+	Event_FireGenericEvent("SpaceStashCore_OpenOptions", self)
 end
 
-function SpaceStashCore:UpdateSpaceStashBankParams()
+function Addon:InitSpaceStashBank()
+	if not self._tLoadingInfo.GUI.isReady then return end
+
+	if self.SSBOptionsFrame == nil then
+		Apollo.AddAddonErrorText(self, "Could not load SSBOptionsFrame	 for some reason.")
+		return
+	end
+
 	self:SetBankSortMehtod(self.db.profile.config.auto.bank.sort)
 	self:UpdateBankRowsSize()
 	self:UpdateBankIconsSize()
+
+	self._tLoadingInfo.SpaceStashBank.isInit = true
 end
 
-function SpaceStashCore:UpdateSpaceStashInventoryParams()
+function Addon:InitSpaceStashInventory()
+	if not self._tLoadingInfo.GUI.isReady then return end
+
+	if self.SSIOptionsFrame == nil then
+		Apollo.AddAddonErrorText(self, "Could not load SSIOptionsFrame for some reason.")
+		return
+	end
+
 	self:SetInventorySortMehtod(self.db.profile.config.auto.inventory.sort)
 	SpaceStashInventory:SetDisplayNew(self.db.profile.config.DisplayNew)
 	self:UpdateTrackedCurrency()
@@ -346,9 +365,11 @@ function SpaceStashCore:UpdateSpaceStashInventoryParams()
 	self.SSIRenownButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Renown))
 	self.SSICraftingVouchersButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers))
 	self.SSICashButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Credits))
+
+	self._tLoadingInfo.SpaceStashInventory.isInit = true
 end	
 
-function SpaceStashCore:OnSlashCommand(strCommand, strParam)
+function Addon:OnSlashCommand(strCommand, strParam)
 	if strParam == "" then 
 
 	self.wndMain:Show(true,true)
@@ -359,7 +380,7 @@ function SpaceStashCore:OnSlashCommand(strCommand, strParam)
 	end
 end
 
-function SpaceStashCore:OnOpenOptions( oHandler )
+function Addon:OnOpenOptions( oHandler )
 	self.wndMain:Show(true,true)
 
 	if oHandler == SpaceStashBank then
@@ -368,8 +389,8 @@ function SpaceStashCore:OnOpenOptions( oHandler )
 
 		self.btnSSIOptions:SetCheck(false)
 		self.btnSSCOptions:SetCheck(false)
-		SpaceStashCore:SpaceStashCoreButtonUncheck()
-		SpaceStashCore:SpaceStashInventoryButtonUncheck()
+		Addon:SpaceStashCoreButtonUncheck()
+		Addon:SpaceStashInventoryButtonUncheck()
 	elseif oHandler == SpaceStashInventory then
 
 		self.btnSSIOptions:SetCheck(true)
@@ -377,26 +398,26 @@ function SpaceStashCore:OnOpenOptions( oHandler )
 
 		self.btnSSCOptions:SetCheck(false)
 		self.btnSSBOptions:SetCheck(false)
-		SpaceStashCore:SpaceStashCoreButtonUncheck()
-		SpaceStashCore:SpaceStashBankButtonUncheck()
+		Addon:SpaceStashCoreButtonUncheck()
+		Addon:SpaceStashBankButtonUncheck()
 	else
 		self.btnSSCOptions:SetCheck(true)
 		self:SpaceStashCoreButtonCheck()
 
 		self.btnSSIOptions:SetCheck(false)
 		self.btnSSBOptions:SetCheck(false)
-		SpaceStashCore:SpaceStashInventoryButtonUncheck()
-		SpaceStashCore:SpaceStashBankButtonUncheck()
+		Addon:SpaceStashInventoryButtonUncheck()
+		Addon:SpaceStashBankButtonUncheck()
 	end
 end
 
-function SpaceStashCore:OnClose( ... )
+function Addon:OnClose( ... )
 
   self.wndMain:Show(false,true)
 end
 
 
-function SpaceStashCore:OnModuleButton(strType,strName)
+function Addon:OnModuleButton(strType,strName)
 	if strType == "Check" then
 		if strName == "SpaceStashCoreButton" then
 			self:SpaceStashCoreButtonCheck()
@@ -416,39 +437,39 @@ function SpaceStashCore:OnModuleButton(strType,strName)
 	end
 end
 
-function SpaceStashCore:SpaceStashCoreButtonCheck()
+function Addon:SpaceStashCoreButtonCheck()
 	self.SSCOptionsFrame:Show(true)
 	self.targetFrame:TransitionPulse()
 end
 
-function SpaceStashCore:SpaceStashCoreButtonUncheck()
+function Addon:SpaceStashCoreButtonUncheck()
 	self.SSCOptionsFrame:Show(false)
 	self.targetFrame:TransitionPulse()
 end
 
-function SpaceStashCore:SpaceStashInventoryButtonCheck()
+function Addon:SpaceStashInventoryButtonCheck()
 	self.SSIOptionsFrame:Show(true)
 	self.targetFrame:TransitionPulse()
 end
 
-function SpaceStashCore:SpaceStashInventoryButtonUncheck()
+function Addon:SpaceStashInventoryButtonUncheck()
 	self.SSIOptionsFrame:Show(false)
 	self.targetFrame:TransitionPulse()
 end
 
   
-function SpaceStashCore:SpaceStashBankButtonCheck()
+function Addon:SpaceStashBankButtonCheck()
 	self.SSBOptionsFrame:Show(true)
 	self.targetFrame:TransitionPulse()
 end
 
 
-function SpaceStashCore:SpaceStashBankButtonUncheck()
+function Addon:SpaceStashBankButtonUncheck()
 	self.SSBOptionsFrame:Show(false)
 	self.targetFrame:TransitionPulse()
 end
 
-function SpaceStashCore:OnCurrencySelectionChange(wndHandler, wndControl, eMouseButton)
+function Addon:OnCurrencySelectionChange(wndHandler, wndControl, eMouseButton)
 	if wndHandler == self.SSIElderGemsButton then
 		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems, self.SSIElderGemsButton:IsChecked())
 	elseif wndHandler == self.SSIPrestigeButton then
@@ -462,7 +483,7 @@ function SpaceStashCore:OnCurrencySelectionChange(wndHandler, wndControl, eMouse
 	end
 end
 
-function SpaceStashCore:UpdateTrackedCurrency()
+function Addon:UpdateTrackedCurrency()
 	local tracked = SpaceStashInventory:GetTrackedCurrency()
 	if tracked == Money.CodeEnumCurrencyType.ElderGems then
 		self.SSIElderGemsButton:SetCheck(true)
@@ -475,37 +496,37 @@ function SpaceStashCore:UpdateTrackedCurrency()
 	end
 end
 
-function SpaceStashCore:OnInventoryIconsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
+function Addon:OnInventoryIconsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
   SpaceStashInventory:SetIconsSize(fNewValue)
   self.SSIIconsSizeText:SetText(fNewValue)
 end 
 
-function SpaceStashCore:UpdateInventoryIconsSize()
+function Addon:UpdateInventoryIconsSize()
   self.SSIIconsSizeSlider:SetValue(SpaceStashInventory:GetIconsSize())
   self.SSIIconsSizeText:SetText(SpaceStashInventory:GetIconsSize())
 end
 
-function SpaceStashCore:OnInventoryRowsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
+function Addon:OnInventoryRowsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
   SpaceStashInventory:SetRowsSize(fNewValue)
   self.SSIRowsSizeText:SetText(fNewValue)
 end 
 
-function SpaceStashCore:UpdateInventoryRowsSize()
+function Addon:UpdateInventoryRowsSize()
   self.SSIRowsSizeSlider:SetValue(SpaceStashInventory:GetRowsSize())
   self.SSIRowsSizeText:SetText(SpaceStashInventory:GetRowsSize())
 end
 
-function SpaceStashCore:OnBankIconsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
+function Addon:OnBankIconsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
   SpaceStashBank:SetIconsSize(fNewValue)
   self.SSBIconsSizeText:SetText(fNewValue)
 end 
 
-function SpaceStashCore:UpdateBankIconsSize()
+function Addon:UpdateBankIconsSize()
   self.SSBIconsSizeSlider:SetValue(SpaceStashBank:GetIconsSize())
   self.SSBIconsSizeText:SetText(SpaceStashBank:GetIconsSize())
 end
 
-function SpaceStashCore:OnBankRowsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
+function Addon:OnBankRowsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
   SpaceStashBank:SetRowsSize(fNewValue)
   self.SSBRowsSizeText:SetText(fNewValue)
 end 
@@ -514,88 +535,88 @@ end
 --- SSC Options
 --------------------------------------------------------------------------------------
 
-function SpaceStashCore:UpdateBankRowsSize()
+function Addon:UpdateBankRowsSize()
   self.SSBRowsSizeSlider:SetValue(SpaceStashBank:GetRowsSize())
   self.SSBRowsSizeText:SetText(SpaceStashBank:GetRowsSize())
 end
 	
-function SpaceStashCore:OnInventoyAtVendorChanged( wndHandler, wndControl )
+function Addon:OnInventoyAtVendorChanged( wndHandler, wndControl )
   self.db.profile.config.auto.inventory.vendor = self.SSCAutoVendor:IsChecked()
 end
 
-function SpaceStashCore:OnInventoyAtBankChanged( wndHandler, wndControl )
+function Addon:OnInventoyAtBankChanged( wndHandler, wndControl )
   self.db.profile.config.auto.inventory.bank = self.SSCAutoBank:IsChecked()
 end
 
-function SpaceStashCore:OnInventoyAtAHChanged( wndHandler, wndControl )
+function Addon:OnInventoyAtAHChanged( wndHandler, wndControl )
   self.db.profile.config.auto.inventory.auctionhouse = self.SSCAutoAH:IsChecked()
 end
 
-function SpaceStashCore:OnInventoyAtCEChanged( wndHandler, wndControl )
+function Addon:OnInventoyAtCEChanged( wndHandler, wndControl )
   self.db.profile.config.auto.inventory.commoditiesexchange = self.SSCAutoCE:IsChecked()
 end
 
-function SpaceStashCore:OnInventoyAtMailboxChanged( wndHandler, wndControl )
+function Addon:OnInventoyAtMailboxChanged( wndHandler, wndControl )
   self.db.profile.config.auto.inventory.mailbox = self.SSCAutoMailbox:IsChecked()
 end
 
-function SpaceStashCore:OnInventoyAtESChanged( wndHandler, wndControl )
+function Addon:OnInventoyAtESChanged( wndHandler, wndControl )
   self.db.profile.config.auto.inventory.engravingstation = self.SSCAutoES:IsChecked()
 end
 
-function SpaceStashCore:OnInventoyAtCraftingStationChanged( wndHandler, wndControl )
+function Addon:OnInventoyAtCraftingStationChanged( wndHandler, wndControl )
   self.db.profile.config.auto.inventory.craftingstation = self.SSCAutoCS:IsChecked()
 end
 
-function SpaceStashCore:OnAutoRepairChange( wndHandler, wndControl )
+function Addon:OnAutoRepairChange( wndHandler, wndControl )
   self.db.profile.config.auto.repair = self.SSCAutoRepair:IsChecked()
 end
 
-function SpaceStashCore:OnAutoSellChange( wndHandler, wndControl )
+function Addon:OnAutoSellChange( wndHandler, wndControl )
   self.db.profile.config.auto.sell.active = self.SSCAutoSell:IsChecked()
 end
 
-function SpaceStashCore:OnSellSalvagableChange( wndHandler, wndControl )
+function Addon:OnSellSalvagableChange( wndHandler, wndControl )
   self.db.profile.config.auto.sell.filters.Salvagables.active = self.SSCSellSavagable:IsChecked()
 end
 
-function SpaceStashCore:OnSellConsumablesChange( wndHandler, wndControl )
+function Addon:OnSellConsumablesChange( wndHandler, wndControl )
 	self.db.profile.config.auto.sell.filters.Consumables.active = self.SSCSellConsumables:IsChecked()
 end
 
-function SpaceStashCore:OnSellCostumesChange( wndHandler, wndControl )
+function Addon:OnSellCostumesChange( wndHandler, wndControl )
 	self.db.profile.config.auto.sell.filters.Costumes.active = self.SSCSellCostumes:IsChecked()
 end
 
-function SpaceStashCore:OnSellAMPChange( wndHandler, wndControl )
+function Addon:OnSellAMPChange( wndHandler, wndControl )
 	self.db.profile.config.auto.sell.filters.AMP.active = self.SSCSellAMP:IsChecked()
 end
 
-function SpaceStashCore:OnSellHousingChange( wndHandler, wndControl )
+function Addon:OnSellHousingChange( wndHandler, wndControl )
 	self.db.profile.config.auto.sell.filters.Housing.active = self.SSCSellHousing:IsChecked()
 end
 
-function SpaceStashCore:OnSellCraftingChange( wndHandler, wndControl )
+function Addon:OnSellCraftingChange( wndHandler, wndControl )
 	self.db.profile.config.auto.sell.filters.Crafting.active = self.SSCSellCrafting:IsChecked()
 end
 
-function SpaceStashCore:OnSellSchematicsChange( wndHandler, wndControl )
+function Addon:OnSellSchematicsChange( wndHandler, wndControl )
 	self.db.profile.config.auto.sell.filters.Schematics.active = self.SSCSellSchematics:IsChecked()
 end
 
-function SpaceStashCore:OnInventorySortToggle( wndHandler, wndControl )
+function Addon:OnInventorySortToggle( wndHandler, wndControl )
   self.SSISortChooserButton:FindChild("ChoiceContainer"):Show(self.SSISortChooserButton:IsChecked(),true)
 end
 
-function SpaceStashCore:OnInventorySortChooserContainerClose()
+function Addon:OnInventorySortChooserContainerClose()
   self.SSISortChooserButton:SetCheck(false)
 end
 
-function SpaceStashCore:OnBankSortToggle( wndHandler, wndControl )
+function Addon:OnBankSortToggle( wndHandler, wndControl )
   self.SSBSortChooserButton:FindChild("ChoiceContainer"):Show(self.SSBSortChooserButton:IsChecked(),true)
 end
 
-function SpaceStashCore:OnBankSortChooserContainerClose()
+function Addon:OnBankSortChooserContainerClose()
   self.SSBSortChooserButton:SetCheck(false)
 end
 
@@ -686,7 +707,7 @@ local fnSortItemsByQuality = function(itemLeft, itemRight)
   return 0
 end
 
-function SpaceStashCore:OnInventorySortSelected(wndHandler, wndControl)
+function Addon:OnInventorySortSelected(wndHandler, wndControl)
   if wndHandler == wndControl then
 	if wndHandler:GetName() == "Choice1" then
 	  self.db.profile.config.auto.inventory.sort = 0
@@ -709,7 +730,7 @@ function SpaceStashCore:OnInventorySortSelected(wndHandler, wndControl)
   end
 end
 
-function SpaceStashCore:SetInventorySortMehtod(nSortMethod)
+function Addon:SetInventorySortMehtod(nSortMethod)
   self.db.profile.config.auto.inventory.sort = nSortMethod
 
   if nSortMethod == 1 then
@@ -725,7 +746,7 @@ function SpaceStashCore:SetInventorySortMehtod(nSortMethod)
 end
 
 
-function SpaceStashCore:OnBankSortSelected(wndHandler, wndControl)
+function Addon:OnBankSortSelected(wndHandler, wndControl)
   if wndHandler == wndControl then
 	if wndHandler:GetName() == "Choice1" then
 	  self.db.profile.config.auto.bank.sort = 0
@@ -749,7 +770,7 @@ function SpaceStashCore:OnBankSortSelected(wndHandler, wndControl)
 end
 
 
-function SpaceStashCore:SetBankSortMehtod(nSortMethod)
+function Addon:SetBankSortMehtod(nSortMethod)
   self.db.profile.config.auto.bank.sort = nSortMethod
 
   if nSortMethod == 1 then
@@ -764,20 +785,20 @@ function SpaceStashCore:SetBankSortMehtod(nSortMethod)
   
 end
 
-function SpaceStashCore:OnDisplayNewItemsChanged()
+function Addon:OnDisplayNewItemsChanged()
   self.db.profile.config.DisplayNew = self.SSCNewItemDisplay:IsChecked()
   SpaceStashInventory:SetDisplayNew(self.db.profile.config.DisplayNew)
 end
 
-function SpaceStashCore:OnSellQualityChooserToggle( wndHandler, wndControl )
+function Addon:OnSellQualityChooserToggle( wndHandler, wndControl )
   self.SSCSellQualityChooserButton:FindChild("ChoiceContainer"):Show(self.SSCSellQualityChooserButton:IsChecked(),true)
 end
 
-function SpaceStashCore:OnSellQualityChooserContainerClose()
+function Addon:OnSellQualityChooserContainerClose()
   self.SSCSellQualityChooserButton:SetCheck(false)
 end
 
-function SpaceStashCore:OnAutoSellQualitySelected(wndHandler, wndControl)
+function Addon:OnAutoSellQualitySelected(wndHandler, wndControl)
   if wndHandler == wndControl then
 	if wndHandler:GetName() == "Choice1" then
 	  self.db.profile.config.auto.sell.QualityTreshold = Item.CodeEnumItemQuality.Inferior
@@ -804,7 +825,7 @@ end
 -------------------------------------------------------------------------------------
 --- Automation related events
 --------------------------------------------------------------------------------------
-function SpaceStashCore:OnShowVendor() 
+function Addon:OnShowVendor() 
   if self.db.profile.config.auto.inventory.vendor then 
 	SpaceStashInventory:OpenInventory()
   end
@@ -819,7 +840,7 @@ function SpaceStashCore:OnShowVendor()
   
 end
 
-function SpaceStashCore:SellItems()
+function Addon:SellItems()
   for _, item in ipairs(GameLib.GetPlayerUnit():GetInventoryItems()) do
 	if self.stringInArray(item.itemInBag:GetName(),self.db.profile.config.auto.sell.whitelist) and item.itemInBag:GetSellPrice() then
 	  SellItemToVendorById(item.itemInBag:GetInventoryId(), item.itemInBag:GetStackCount())
@@ -829,13 +850,13 @@ function SpaceStashCore:SellItems()
   end
 end
 
-function SpaceStashCore.stringInArray(str,array)
+function Addon.stringInArray(str,array)
 	for k,v in ipairs(array) do
 		if str == v then return true end
 	end
 end
 
-function SpaceStashCore:OnSellWhitelistChange()
+function Addon:OnSellWhitelistChange()
 	local lines = {}
 	local str = self.SellWhitelist:GetText()
 	self.db.profile.config.auto.sell.whitelistRaw = self.SellWhitelist:GetText()
@@ -845,7 +866,7 @@ function SpaceStashCore:OnSellWhitelistChange()
 	self.db.profile.config.auto.sell.whitelist = lines
 end
 
-function SpaceStashCore:OnSellBlacklistChange()
+function Addon:OnSellBlacklistChange()
 	local lines = {}
 	local str = self.SellBlacklist:GetText()
 	self.db.profile.config.auto.sell.blacklistRaw = self.SellBlacklist:GetText()
@@ -855,7 +876,7 @@ function SpaceStashCore:OnSellBlacklistChange()
 	self.db.profile.config.auto.sell.blacklist = lines
 end
 
-function SpaceStashCore:FilterItem(item)
+function Addon:FilterItem(item)
 	local filterArray = self.db.profile.config.auto.sell.filters
 	local bFamily = false
 	local bNoFamily = true
@@ -880,44 +901,44 @@ function SpaceStashCore:FilterItem(item)
 	return bFamily or bNoFamily
 end
 
-function SpaceStashCore.FilterItemFamily(item)
+function Addon.FilterItemFamily(item)
 
 end
 
 
 ------------------------------------------------------------------------
 
-function SpaceStashCore:OnShowBank() 
+function Addon:OnShowBank() 
   if not self.db.profile.config.auto.inventory.bank then return end
 
   SpaceStashInventory:OpenInventory()
 end
 
-function SpaceStashCore:OnShowAuctionHouse( wndHandler, wndControl )
+function Addon:OnShowAuctionHouse( wndHandler, wndControl )
   if not self.db.profile.config.auto.inventory.auctionhouse then return end
 
   SpaceStashInventory:OpenInventory()
 end
 
-function SpaceStashCore:OnShowCommoditiesExchange( wndHandler, wndControl )
+function Addon:OnShowCommoditiesExchange( wndHandler, wndControl )
   if not self.db.profile.config.auto.inventory.commoditiesexchange then return end
 
   SpaceStashInventory:OpenInventory()
 end
 
-function SpaceStashCore:OnShowMailbox( wndHandler, wndControl )
+function Addon:OnShowMailbox( wndHandler, wndControl )
   if not self.db.profile.config.auto.inventory.mailbox then return end
 
   SpaceStashInventory:OpenInventory()
 end
 
-function SpaceStashCore:OnShowEngravingStation()
+function Addon:OnShowEngravingStation()
   if not self.db.profile.config.auto.inventory.engravingstation then return end
 
   SpaceStashInventory:OpenInventory()
 end
 
-function SpaceStashCore:OnShowCraftingStation()
+function Addon:OnShowCraftingStation()
   if not self.db.profile.config.auto.inventory.craftingstation then return end
 
   SpaceStashInventory:OpenInventory()

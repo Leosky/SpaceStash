@@ -46,9 +46,10 @@ defaults.profile.config.currencies[Money.CodeEnumCurrencyType.Credits] = true
 defaults.profile.config.SelectedTab = Addon.CodeEnumTabDisplay.BagsTab
 defaults.profile.config.DisplayNew = false
 
-local tThirdAddonsInfos = {
+local _tLoadingInfo = {
 	WindowManagement = { isReady = false , isInit = false },
 	SpaceStashCore = { isReady = false , isInit = false },
+	GUI = { isReady = false, isInit = false },
 }
 
 local tCurrenciesWindows = {}
@@ -60,10 +61,8 @@ local nCurrenciesWindowsSize = 0
 function Addon:OnInitialize()
 	self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
  
-	self._ThirdAddonsInfos = tThirdAddonsInfos
-	self._tLoadingInfo = { 
-		GUI = { isReady = false },
-	}
+	self._tLoadingInfo = _tLoadingInfo
+
 	glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
 		level = "INFO",
 		pattern = "%d [%c:%n] %l - %m",
@@ -80,7 +79,8 @@ function Addon:OnInitialize()
 end
 
 function Addon:OnEnable()
- 	self._ThirdAddonsInfos.SpaceStashCore.instance = Apollo.GetAddon("SpaceStashCore")
+ 	self._tLoadingInfo.SpaceStashCore.instance = Apollo.GetAddon("SpaceStashCore")
+ 	self._tLoadingInfo.test = Apollo.GetAddon("SpaceStashBank")
 
 	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashInventory.xml")
 	self.xmlDoc:RegisterCallback("OnDocumentReady", self)
@@ -225,23 +225,24 @@ end
 
 function Addon:FinalizeLoading()
 	self._tLoadingInfo.GUI.isReady = true;
-	if self._ThirdAddonsInfos.WindowManagement.isReady and not self._ThirdAddonsInfos.WindowManagement.isInit then
+	if self._tLoadingInfo.WindowManagement.isReady and not self._tLoadingInfo.WindowManagement.isInit then
 		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR})
-		self._ThirdAddonsInfos.WindowManagement.isInit = true
+		self._tLoadingInfo.WindowManagement.isInit = true
 	end
  
-	if self._ThirdAddonsInfos.SpaceStashCore.isReady and not self._ThirdAddonsInfos.SpaceStashCore.isInit then 
+	if self._tLoadingInfo.SpaceStashCore.isReady and not self._tLoadingInfo.SpaceStashCore.isInit then 
 		self:InitSpaceStashCore()
 	end
 	
+	self._tLoadingInfo.GUI.isInit = true
 	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = MAJOR})
 end
  
 function Addon:OnWindowManagementReady()
-	self._ThirdAddonsInfos.WindowManagement.isReady = true
+	self._tLoadingInfo.WindowManagement.isReady = true
 	if self._tLoadingInfo.GUI.isReady then
 		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR})
-		self._ThirdAddonsInfos.WindowManagement.isInit = true
+		self._tLoadingInfo.WindowManagement.isInit = true
 	end
  
 end
@@ -254,14 +255,16 @@ function Addon:OnAddonFullyLoaded(args)
 	if args.strName == "Rover" then
 		Event_FireGenericEvent("SendVarToRover", MAJOR, self)
 	elseif args.strName == "SpaceStashCore" then
+		self._tLoadingInfo.SpaceStashCore.isReady = true
 		self:InitSpaceStashCore()
 	end
 end
 
 function Addon:InitSpaceStashCore()
+	if not self._tLoadingInfo.GUI.isReady then return end
 	-- DO YOUR DEPENDENCY INIT STUFF HERE
  
-	self._ThirdAddonsInfos.SpaceStashCore.isInit = true
+	self._tLoadingInfo.SpaceStashCore.isInit = true
 end
 
 -----------------------------------------------------------------------------------------------
