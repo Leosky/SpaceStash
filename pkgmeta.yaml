@@ -1,0 +1,57 @@
+package-as: SpaceStash
+
+externals:
+	SpaceStashBank/lib/GeminiAddon:
+		url: git://github.com/wildstarnasa/GeminiAddon.git
+		tag: latest
+	SpaceStashCore/lib/GeminiAddon:
+		url: git://github.com/wildstarnasa/GeminiAddon.git
+		tag: latest
+	SpaceStashInventory/lib/GeminiAddon:
+		url: git://github.com/wildstarnasa/GeminiAddon.git
+		tag: latest
+	SpaceStashBank/lib/GeminiDB:
+		url: git://github.com/wildstarnasa/GeminiDB.git
+		tag: latest
+	SpaceStashCore/lib/GeminiDB:
+		url: git://github.com/wildstarnasa/GeminiDB.git
+		tag: latest
+	SpaceStashInventory/lib/GeminiDB:
+		url: git://github.com/wildstarnasa/GeminiDB.git
+		tag: latest
+	SpaceStashBank/lib/GeminiLocale:
+		url: git://github.com/wildstarnasa/GeminiLocale.git
+		tag: latest
+	SpaceStashCore/lib/GeminiLocale:
+		url: git://github.com/wildstarnasa/GeminiLocale.git
+		tag: latest
+	SpaceStashInventory/lib/GeminiLocale:
+		url: git://github.com/wildstarnasa/GeminiLocale.git
+		tag: latest
+	SpaceStashBank/lib/GeminiLogging:
+		url: git://github.com/wildstarnasa/GeminiLogging.git
+		tag: latest
+	SpaceStashCore/lib/GeminiLogging:
+		url: git://github.com/wildstarnasa/GeminiLogging.git
+		tag: latest
+	SpaceStashInventory/lib/GeminiLogging:
+		url: git://github.com/wildstarnasa/GeminiLogging.git
+		tag: latest
+	SpaceStashBank/lib/LibError:
+		url: git://github.com/wildstarnasa/LibError.git
+		tag: latest
+	SpaceStashCore/lib/LibError:
+		url: git://github.com/wildstarnasa/LibError.git
+		tag: latest
+	SpaceStashInventory/lib/LibError:
+		url: git://github.com/wildstarnasa/LibError.git
+		tag: latest
+	SpaceStashBank/lib/LibDialog:
+		url: https://github.com/wildstarnasa/LibDialog.git
+		tag: latest
+	SpaceStashCore/lib/LibDialog:
+		url: https://github.com/wildstarnasa/LibDialog.git
+		tag: latest
+	SpaceStashInventory/lib/LibDialog:
+		url: https://github.com/wildstarnasa/LibDialog.git
+		tag: latest
