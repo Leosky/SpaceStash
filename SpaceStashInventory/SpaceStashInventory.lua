@@ -56,7 +56,7 @@ local tCurrenciesWindows = {}
 local nCurrenciesWindowsSize = 0
 
 -----------------------------------------------------------------------------------------------
--- Base Wildstar addon behaviours
+-- SSI Base GeminiAddon behaviors
 -----------------------------------------------------------------------------------------------
 function Addon:OnInitialize()
 	self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
@@ -80,7 +80,6 @@ end
 
 function Addon:OnEnable()
  	self._tLoadingInfo.SpaceStashCore.instance = Apollo.GetAddon("SpaceStashCore")
- 	self._tLoadingInfo.test = Apollo.GetAddon("SpaceStashBank")
 
 	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashInventory.xml")
 	self.xmlDoc:RegisterCallback("OnDocumentReady", self)
@@ -150,6 +149,8 @@ function Addon:OnDocumentReady()
 
 	self:SetSortMehtod(self.db.profile.config.sort)
 
+
+	--TODO: refactor following if block
 	if self.db.profile.config.SelectedTab == Addon.CodeEnumTabDisplay.BagsTab then
 		self.wndTopFrame:FindChild("ShowBagsTabButton"):SetCheck(true)
 		self.wndBagsTabFrame:Show(true)
@@ -262,169 +263,65 @@ end
 
 function Addon:InitSpaceStashCore()
 	if not self._tLoadingInfo.GUI.isReady then return end
-	-- DO YOUR DEPENDENCY INIT STUFF HERE
+	-- TODO: a way to defer SSI fully loaded to SSC (for senor plow modification).
  
 	self._tLoadingInfo.SpaceStashCore.isInit = true
 end
 
------------------------------------------------------------------------------------------------
--- Item Deleting (c) Carbine
------------------------------------------------------------------------------------------------
-function Addon:OnSystemBeginDragDrop(wndSource, strType, iData)
-	if strType ~= "DDBagItem" then return end
+---------------------------------------------------------------------------------------------------
+-- SSI Commands
+---------------------------------------------------------------------------------------------------
 
-	local item = self.wndBagWindow:GetItem(iData)
-
-	if item and item:CanSalvage() then
-		self.btnSalvage:SetData(true)
+-- on /ssi console command
+function Addon:OnSlashCommand(strCommand, strParam)
+	if strParam == "" then
+		self:OnVisibilityToggle()
+	elseif strParam == "info" then
+		glog:info(self)
+	elseif strParam == "redraw" then
+		self:Redraw()
 	end
-
-	Sound.Play(Sound.PlayUI45LiftVirtual)
-end
-
-function Addon:OnSystemEndDragDrop(strType, iData)
-	if not self.wndMain or not self.wndMain:IsValid() or not self.btnSalvage or strType == "DDGuildBankItem" or strType == "DDWarPartyBankItem" or strType == "DDGuildBankItemSplitStack" then
-		return -- TODO Investigate if there are other types///
-	end
-
-	self.btnSalvage:SetData(false)
-
-	Sound.Play(Sound.PlayUI46PlaceVirtual)
-end
-
-function Addon:OnDeleteCancel()
-	self.wndDeleteConfirm:SetData(nil)
-	self.wndDeleteConfirm:Close()
-end
-
-function Addon:InvokeDeleteConfirmWindow(iData)
-	local itemData = Item.GetItemFromInventoryLoc(iData)
-	if itemData and not itemData:CanDelete() then
-		return
-	end
-	self.wndDeleteConfirm:SetData(iData)
-	self.wndDeleteConfirm:Show(true)
-	self.wndDeleteConfirm:ToFront()
-	self.wndDeleteConfirm:FindChild("DeleteBtn"):SetActionData(GameLib.CodeEnumConfirmButtonType.DeleteItem, iData)
-	Sound.Play(Sound.PlayUI55ErrorVirtual)
-end
-
-function Addon:OnDeleteConfirm()
-	self:OnDeleteCancel()
-end
-
-function Addon:OnBagDragDropCancel(wndHandler, wndControl, strType, iData, eReason)
-	if strType ~= "DDBagItem" or eReason == Apollo.DragDropCancelReason.EscapeKey or eReason == Apollo.DragDropCancelReason.ClickedOnNothing then
-		return false
-	end
-
-	if eReason == Apollo.DragDropCancelReason.ClickedOnWorld or eReason == Apollo.DragDropCancelReason.DroppedOnNothing then
-		self:InvokeDeleteConfirmWindow(iData)
-	end
-	return false
-end
-
--- Trash Icon
-function Addon:OnDragDropTrash(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
-	if strType == "DDBagItem" then
-		self:InvokeDeleteConfirmWindow(iData)
-	end
-	return false
-end
-
------------------------------------------------------------------------------------------------
--- Drag & Drop On Salvage button support
------------------------------------------------------------------------------------------------
-function Addon:OnDragDropSalvage(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
-	if strType == "DDBagItem" and self.btnSalvage:GetData() then
-		self:InvokeSalvageConfirmWindow(iData)
-	end
-	return false
-end
-
-function Addon:OnQueryDragDropSalvage(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
-	if strType == "DDBagItem" and self.btnSalvage:GetData() then
-		return Apollo.DragDropQueryResult.Accept
-	end
-	return Apollo.DragDropQueryResult.Ignore
-end
-
-function Addon:OnDragDropNotifySalvage(wndHandler, wndControl, bMe) -- TODO: We can probably replace this with a button mouse over state
-	if bMe and self.btnSalvage:GetData() then
-		--self.wndMain:FindChild("SalvageIcon"):SetSprite("CRB_Inventory:InvBtn_SalvageToggleFlyby")
-		--self.wndMain:FindChild("TextActionPrompt_Salvage"):Show(true)
-	elseif self.btnSalvage:GetData() then
-		--self.wndMain:FindChild("SalvageIcon"):SetSprite("CRB_Inventory:InvBtn_SalvageTogglePressed")
-		--self.wndMain:FindChild("TextActionPrompt_Salvage"):Show(false)
-	end
-end
-
-function Addon:InvokeDeleteConfirmWindow(iData)
-	local itemData = Item.GetItemFromInventoryLoc(iData)
-	if itemData and not itemData:CanDelete() then
-		return
-	end
-	self.wndDeleteConfirm:SetData(iData)
-	self.wndDeleteConfirm:Show(true)
-	self.wndDeleteConfirm:ToFront()
-	self.wndDeleteConfirm:FindChild("DeleteBtn"):SetActionData(GameLib.CodeEnumConfirmButtonType.DeleteItem, iData)
-	Sound.Play(Sound.PlayUI55ErrorVirtual)
-end
-
-function Addon:InvokeSalvageConfirmWindow(iData)
-	self.wndSalvageConfirm:SetData(iData)
-	self.wndSalvageConfirm:Show(true)
-	self.wndSalvageConfirm:ToFront()
-	self.wndSalvageConfirm:FindChild("SalvageBtn"):SetActionData(GameLib.CodeEnumConfirmButtonType.SalvageItem, iData)
-	Sound.Play(Sound.PlayUI55ErrorVirtual)
-end
-
-function Addon:OnSalvageConfirm()
-	self:OnSalvageCancel()
-end
-
-function Addon:OnSalvageCancel()
-	self.wndSalvageConfirm:SetData(nil)
-	self.wndSalvageConfirm:Close()
-end
-
------------------------------------------------------------------------------------------------
--- Stack Splitting (c) Carbine
------------------------------------------------------------------------------------------------
-
-function Addon:OnSplitItemStack(item)
-	if not item then return end
-	local wndSplit = self.wndMain:FindChild("SplitStackContainer")
-	local nStackCount = item:GetStackCount()
-	if nStackCount < 2 then
-		wndSplit:Show(false)
-		return
-	end
-	wndSplit:SetData(item)
-	wndSplit:FindChild("SplitValue"):SetValue(1)
-	wndSplit:FindChild("SplitValue"):SetMinMax(1, nStackCount - 1)
-	wndSplit:Show(true)
-end
-
-function Addon:OnSplitStackCloseClick()
-	self.wndMain:FindChild("SplitStackContainer"):Show(false)
-end
-
-function Addon:OnSplitStackConfirm(wndHandler, wndCtrl)
-	local wndSplit = self.wndMain:FindChild("SplitStackContainer")
-	local tItem = wndSplit:GetData()
-	wndSplit:Show(false)
-	self.wndMain:FindChild("BagWindow"):StartSplitStack(tItem, wndSplit:FindChild("SplitValue"):GetValue())
-end
-
-function Addon:ResetConfig()
-	self.db.profile.config = defaults
-
-	self:OnPlayerButtonUncheck() --to be sure that the option window is corresponding
 end
 
 ---------------------------------------------------------------------------------------------------
--- SpaceStashInventory Commands
+-- SSI Visibility and positionning
+---------------------------------------------------------------------------------------------------
+function Addon:CloseInventory()
+	if not self._tLoadingInfo.GUI.isReady then return end
+
+	--TODO: implement 'standby mode' to use less perf.
+	self.wndMain:Show(false,true)
+	self.wndBagWindow:MarkAllItemsAsSeen()
+	Sound.Play(Sound.PlayUIBagClose) --CUSTOM: chosable sound
+end
+
+---
+--- This function show the inventory and update relevant 
+---
+function Addon:OpenInventory()
+	if not self._tLoadingInfo.GUI.isReady then return end
+	
+	--TODO: implement 'standby mode' to use less perf. see @CloseInventory()
+
+	--TODO: Verify that currency things here are useful.
+	self:OnInventoryDisplayChange()
+	self:UpdateCashAmount()
+	self.wndMain:Show(true,true)
+	Sound.Play(Sound.PlayUIBagOpen) --CUSTOM: chosable sound
+end
+
+function Addon:OnVisibilityToggle() --TODO: Check if isReady is enought or if isInit will be required (see @CloseInventory and @OpenInventory too)
+	if not self._tLoadingInfo.GUI.isReady then return end
+
+	if self.wndMain:IsShown() then
+		self:CloseInventory()
+	else
+		self:OpenInventory()
+	end
+end
+
+---------------------------------------------------------------------------------------------------
+-- TODO: SSI quest inventory tab
 ---------------------------------------------------------------------------------------------------
 function Addon:OnQuestObjectiveUpdated()
 	self:UpdateVirtualItemInventory()
@@ -470,31 +367,6 @@ function Addon:UpdateVirtualItemInventory()
 
 	self:Redraw()
 end
----------------------------------------------------------------------------------------------------
--- SpaceStashInventory Commands
----------------------------------------------------------------------------------------------------
-
--- on /ssi console command
-function Addon:OnSlashCommand(strCommand, strParam)
-	if strParam == "" then
-		self:OnVisibilityToggle()
-	elseif strParam == "info" then
-		glog:info(self)
-	elseif strParam == "redraw" then
-		self:Redraw()
-	end
-end
----------------------------------------------------------------------------------------------------
--- SpaceStashInventoryForm
----------------------------------------------------------------------------------------------------
--- update the windows position in the config as the user move it to save position between sessions.
-function  Addon:OnWindowMove()
-	-- TODO: Check that the window is in the screen
-	-- TODO: add an option to keep the entire frame in screen
-
-
-end
-
 
 function Addon:OnOptions()
   Event_FireGenericEvent("SpaceStashCore_OpenOptions", self)
@@ -594,39 +466,12 @@ function Addon:OnInventoryDisplayChange()
 
 end
 
--- when the Cancel button is clicked
-function Addon:OnClose()
-  self.wndMain:Show(false,true)
-  self.wndBagWindow:MarkAllItemsAsSeen()
-  Sound.Play(Sound.PlayUIBagClose)
-end
+
 
 function Addon:OnItemLoot()
-  if not self.db.profile.config.DisplayNew then self.wndBagWindow:MarkAllItemsAsSeen() end
-end
-
-function Addon:OnVisibilityToggle()
 	if not self._tLoadingInfo.GUI.isReady then return end
 
-	if self.wndMain:IsShown() then
-		self.wndMain:Show(false,true)
-    	self.wndBagWindow:MarkAllItemsAsSeen()
-		Sound.Play(Sound.PlayUIBagClose)
-	else
-		self:OnInventoryDisplayChange()
-		self:UpdateCashAmount()
-		self.wndMain:Show(true,true)
-		Sound.Play(Sound.PlayUIBagOpen)
-	end
-end
-
-function Addon:OpenInventory()
-	if not self.wndMain:IsShown() then
-		self:OnInventoryDisplayChange()
-		self:UpdateCashAmount()
-		self.wndMain:Show(true,true)
-		Sound.Play(Sound.PlayUIBagOpen)
-	end
+	if not self.db.profile.config.DisplayNew then self.wndBagWindow:MarkAllItemsAsSeen() end
 end
 
 -- Update the window sizing an properties (not the 'volatiles' as currencies amounts, new item icon, etc.)
@@ -976,4 +821,160 @@ end
 
 function Addon:SetDisplayNew(bDisplay)
 	self.db.profile.config.DisplayNew = bDisplay
+end
+
+-----------------------------------------------------------------------------------------------
+-- Item Deleting (c) Carbine
+-----------------------------------------------------------------------------------------------
+function Addon:OnSystemBeginDragDrop(wndSource, strType, iData)
+	if strType ~= "DDBagItem" then return end
+
+	local item = self.wndBagWindow:GetItem(iData)
+
+	if item and item:CanSalvage() then
+		self.btnSalvage:SetData(true)
+	end
+
+	Sound.Play(Sound.PlayUI45LiftVirtual)
+end
+
+function Addon:OnSystemEndDragDrop(strType, iData)
+	if not self.wndMain or not self.wndMain:IsValid() or not self.btnSalvage or strType == "DDGuildBankItem" or strType == "DDWarPartyBankItem" or strType == "DDGuildBankItemSplitStack" then
+		return -- TODO Investigate if there are other types///
+	end
+
+	self.btnSalvage:SetData(false)
+
+	Sound.Play(Sound.PlayUI46PlaceVirtual)
+end
+
+function Addon:OnDeleteCancel()
+	self.wndDeleteConfirm:SetData(nil)
+	self.wndDeleteConfirm:Close()
+end
+
+function Addon:InvokeDeleteConfirmWindow(iData)
+	local itemData = Item.GetItemFromInventoryLoc(iData)
+	if itemData and not itemData:CanDelete() then
+		return
+	end
+	self.wndDeleteConfirm:SetData(iData)
+	self.wndDeleteConfirm:Show(true)
+	self.wndDeleteConfirm:ToFront()
+	self.wndDeleteConfirm:FindChild("DeleteBtn"):SetActionData(GameLib.CodeEnumConfirmButtonType.DeleteItem, iData)
+	Sound.Play(Sound.PlayUI55ErrorVirtual)
+end
+
+function Addon:OnDeleteConfirm()
+	self:OnDeleteCancel()
+end
+
+function Addon:OnBagDragDropCancel(wndHandler, wndControl, strType, iData, eReason)
+	if strType ~= "DDBagItem" or eReason == Apollo.DragDropCancelReason.EscapeKey or eReason == Apollo.DragDropCancelReason.ClickedOnNothing then
+		return false
+	end
+
+	if eReason == Apollo.DragDropCancelReason.ClickedOnWorld or eReason == Apollo.DragDropCancelReason.DroppedOnNothing then
+		self:InvokeDeleteConfirmWindow(iData)
+	end
+	return false
+end
+
+-- Trash Icon
+function Addon:OnDragDropTrash(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
+	if strType == "DDBagItem" then
+		self:InvokeDeleteConfirmWindow(iData)
+	end
+	return false
+end
+
+-----------------------------------------------------------------------------------------------
+-- Drag & Drop On Salvage button support
+-----------------------------------------------------------------------------------------------
+function Addon:OnDragDropSalvage(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
+	if strType == "DDBagItem" and self.btnSalvage:GetData() then
+		self:InvokeSalvageConfirmWindow(iData)
+	end
+	return false
+end
+
+function Addon:OnQueryDragDropSalvage(wndHandler, wndControl, nX, nY, wndSource, strType, iData)
+	if strType == "DDBagItem" and self.btnSalvage:GetData() then
+		return Apollo.DragDropQueryResult.Accept
+	end
+	return Apollo.DragDropQueryResult.Ignore
+end
+
+function Addon:OnDragDropNotifySalvage(wndHandler, wndControl, bMe) -- TODO: We can probably replace this with a button mouse over state
+	if bMe and self.btnSalvage:GetData() then
+		--self.wndMain:FindChild("SalvageIcon"):SetSprite("CRB_Inventory:InvBtn_SalvageToggleFlyby")
+		--self.wndMain:FindChild("TextActionPrompt_Salvage"):Show(true)
+	elseif self.btnSalvage:GetData() then
+		--self.wndMain:FindChild("SalvageIcon"):SetSprite("CRB_Inventory:InvBtn_SalvageTogglePressed")
+		--self.wndMain:FindChild("TextActionPrompt_Salvage"):Show(false)
+	end
+end
+
+function Addon:InvokeDeleteConfirmWindow(iData)
+	local itemData = Item.GetItemFromInventoryLoc(iData)
+	if itemData and not itemData:CanDelete() then
+		return
+	end
+	self.wndDeleteConfirm:SetData(iData)
+	self.wndDeleteConfirm:Show(true)
+	self.wndDeleteConfirm:ToFront()
+	self.wndDeleteConfirm:FindChild("DeleteBtn"):SetActionData(GameLib.CodeEnumConfirmButtonType.DeleteItem, iData)
+	Sound.Play(Sound.PlayUI55ErrorVirtual)
+end
+
+function Addon:InvokeSalvageConfirmWindow(iData)
+	self.wndSalvageConfirm:SetData(iData)
+	self.wndSalvageConfirm:Show(true)
+	self.wndSalvageConfirm:ToFront()
+	self.wndSalvageConfirm:FindChild("SalvageBtn"):SetActionData(GameLib.CodeEnumConfirmButtonType.SalvageItem, iData)
+	Sound.Play(Sound.PlayUI55ErrorVirtual)
+end
+
+function Addon:OnSalvageConfirm()
+	self:OnSalvageCancel()
+end
+
+function Addon:OnSalvageCancel()
+	self.wndSalvageConfirm:SetData(nil)
+	self.wndSalvageConfirm:Close()
+end
+
+-----------------------------------------------------------------------------------------------
+-- Stack Splitting (c) Carbine
+-----------------------------------------------------------------------------------------------
+
+function Addon:OnSplitItemStack(item)
+	if not item then return end
+	local wndSplit = self.wndMain:FindChild("SplitStackContainer")
+	local nStackCount = item:GetStackCount()
+	if nStackCount < 2 then
+		wndSplit:Show(false)
+		return
+	end
+	wndSplit:SetData(item)
+	wndSplit:FindChild("SplitValue"):SetValue(1)
+	wndSplit:FindChild("SplitValue"):SetMinMax(1, nStackCount - 1)
+	wndSplit:Show(true)
+end
+
+function Addon:OnSplitStackCloseClick()
+	self.wndMain:FindChild("SplitStackContainer"):Show(false)
+end
+
+function Addon:OnSplitStackConfirm(wndHandler, wndCtrl)
+	local wndSplit = self.wndMain:FindChild("SplitStackContainer")
+	local tItem = wndSplit:GetData()
+	wndSplit:Show(false)
+	self.wndMain:FindChild("BagWindow"):StartSplitStack(tItem, wndSplit:FindChild("SplitValue"):GetValue())
+end
+
+function Addon:ResetConfig()
+	self.db.profile.config = defaults
+
+	self:OnPlayerButtonUncheck() --to be sure that the option window is corresponding
 end
