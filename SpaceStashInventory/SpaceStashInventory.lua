@@ -841,6 +841,14 @@ function Addon:OnCloseCurrenciesMicroMenu()
 end
 
 function Addon:OnPlayerCurrencyChanged()
+	for i = 1, #currencies do
+    	if currencies[i].account then 
+    		currencies[i].currencyObject = AccountItemLib.GetAccountCurrency(currencies[i].eType)
+    	else
+    		currencies[i].currencyObject = GameLib.GetPlayerCurrency(currencies[i].eType)
+    	end
+    end
+
     if self.wndMain:IsShown() then
         self:UpdateCashAmount()
      end
