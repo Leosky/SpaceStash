@@ -136,7 +136,7 @@ function Addon:OnDocumentReady()
 	end
 
 	self.wndMain:Show(false,true)
-
+	self.wndTarget = self.wndMain:FindChild("TargetFrame");
 	self.SSCOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSCOptionsFrame", self.targetFrame, self)
 
 	if self.SSCOptionsFrame == nil then
@@ -167,12 +167,15 @@ function Addon:OnDocumentReady()
 	-----SSI OPtions -----
 	self.SSIOptionsFrame = Apollo.LoadForm(self.xmlDoc, "SSIOptionsFrame", self.targetFrame, self)
 
-	
-	self.SSIElderGemsButton = self.SSIOptionsFrame:FindChild("ElderGemsButton")
-	self.SSIPrestigeButton = self.SSIOptionsFrame:FindChild("PrestigeButton")
-	self.SSIRenownButton = self.SSIOptionsFrame:FindChild("RenownButton")
-	self.SSICraftingVouchersButton = self.SSIOptionsFrame:FindChild("CraftingVouchersButton")
 	self.SSICashButton = self.SSIOptionsFrame:FindChild("CashButton")
+	self.SSIRenownButton = self.SSIOptionsFrame:FindChild("RenownButton")
+	self.SSIElderGemsButton = self.SSIOptionsFrame:FindChild("ElderGemsButton")
+	self.SSIGloryButton = self.SSIOptionsFrame:FindChild("GloryButton")
+	self.SSIPrestigeButton = self.SSIOptionsFrame:FindChild("PrestigeButton")
+	self.SSICraftingVouchersButton = self.SSIOptionsFrame:FindChild("CraftingVouchersButton")
+	self.SSIOmnibitsButtonButton = self.SSIOptionsFrame:FindChild("OmnibitsButton")
+	self.SSIServiceTokensButton = self.SSIOptionsFrame:FindChild("ServiceTokensButton")
+	self.SSIFortuneCoinsButton = self.SSIOptionsFrame:FindChild("FortuneCoinsButton")
 
 	self.SSIIconsSizeSlider = self.SSIOptionsFrame:FindChild("SSIIconsSizeSlider")
 	self.SSIIconsSizeText = self.SSIOptionsFrame:FindChild("SSIIconsSizeText")
@@ -360,11 +363,15 @@ function Addon:InitSpaceStashInventory()
 	self:UpdateInventoryIconsSize()
 	self:UpdateInventoryRowsSize()
 
-	self.SSIElderGemsButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems))
-	self.SSIPrestigeButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Prestige))
-	self.SSIRenownButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Renown))
-	self.SSICraftingVouchersButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers))
-	self.SSICashButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(Money.CodeEnumCurrencyType.Credits))
+	self.SSICashButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(1))
+	self.SSIRenownButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(2))
+	self.SSIElderGemsButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(3))
+	self.SSIGloryButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(3))
+	self.SSIPrestigeButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(5))
+	self.SSICraftingVouchersButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(6))
+	self.SSIOmnibitsButtonButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(7))
+	self.SSIServiceTokensButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(8))
+	self.SSIFortuneCoinsButton:SetCheck(SpaceStashInventory:GetTrackedCurrency(9))
 
 	self._tLoadingInfo.SpaceStashInventory.isInit = true
 end	
@@ -439,61 +446,69 @@ end
 
 function Addon:SpaceStashCoreButtonCheck()
 	self.SSCOptionsFrame:Show(true)
-	self.targetFrame:TransitionPulse()
+	self.wndTarget:SetVScrollPos(0)
+	self.wndTarget:Reposition()
 end
 
 function Addon:SpaceStashCoreButtonUncheck()
 	self.SSCOptionsFrame:Show(false)
-	self.targetFrame:TransitionPulse()
 end
 
 function Addon:SpaceStashInventoryButtonCheck()
 	self.SSIOptionsFrame:Show(true)
-	self.targetFrame:TransitionPulse()
+	self.wndTarget:SetVScrollPos(0)
+	self.wndTarget:Reposition()
 end
 
 function Addon:SpaceStashInventoryButtonUncheck()
 	self.SSIOptionsFrame:Show(false)
-	self.targetFrame:TransitionPulse()
 end
-
   
 function Addon:SpaceStashBankButtonCheck()
 	self.SSBOptionsFrame:Show(true)
-	self.targetFrame:TransitionPulse()
+	self.wndTarget:SetVScrollPos(0)
+	self.wndTarget:Reposition()
 end
 
 
 function Addon:SpaceStashBankButtonUncheck()
 	self.SSBOptionsFrame:Show(false)
-	self.targetFrame:TransitionPulse()
 end
 
 function Addon:OnCurrencySelectionChange(wndHandler, wndControl, eMouseButton)
-	if wndHandler == self.SSIElderGemsButton then
-		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems, self.SSIElderGemsButton:IsChecked())
-	elseif wndHandler == self.SSIPrestigeButton then
-		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.Prestige, self.SSIPrestigeButton:IsChecked())
+	if wndHandler == self.SSICashButton then
+		SpaceStashInventory:SetTrackedCurrency(1, self.SSICashButton:IsChecked())
 	elseif wndHandler == self.SSIRenownButton then
-		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.Renown, self.SSIRenownButton:IsChecked())
+		SpaceStashInventory:SetTrackedCurrency(2, self.SSIRenownButton:IsChecked())
+	elseif wndHandler == self.SSIElderGemsButton then
+		SpaceStashInventory:SetTrackedCurrency(3, self.SSIElderGemsButton:IsChecked())
+	elseif wndHandler == self.SSIGloryButton then
+		SpaceStashInventory:SetTrackedCurrency(4, self.SSIGloryButton:IsChecked())
+	elseif wndHandler == self.SSIPrestigeButton then
+		SpaceStashInventory:SetTrackedCurrency(5, self.SSIPrestigeButton:IsChecked())
 	elseif wndHandler == self.SSICraftingVouchersButton then
-		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers, self.SSICraftingVouchersButton:IsChecked())
-	elseif wndHandler == self.SSICashButton then
-		SpaceStashInventory:SetTrackedCurrency(Money.CodeEnumCurrencyType.Credits, self.SSICashButton:IsChecked())
+		SpaceStashInventory:SetTrackedCurrency(6, self.SSICraftingVouchersButton:IsChecked())
+	elseif wndHandler == self.SSIOmnibitsButtonButton then
+		SpaceStashInventory:SetTrackedCurrency(7, self.SSIOmnibitsButtonButton:IsChecked())
+	elseif wndHandler == self.SSIServiceTokensButton then
+		SpaceStashInventory:SetTrackedCurrency(8, self.SSIServiceTokensButton:IsChecked())
+	elseif wndHandler == self.SSIFortuneCoinsButton then
+		SpaceStashInventory:SetTrackedCurrency(9, self.SSIFortuneCoinsButton:IsChecked())
 	end
 end
 
 function Addon:UpdateTrackedCurrency()
+
 	local tracked = SpaceStashInventory:GetTrackedCurrency()
-	if tracked == Money.CodeEnumCurrencyType.ElderGems then
-		self.SSIElderGemsButton:SetCheck(true)
-	elseif tracked == Money.CodeEnumCurrencyType.Prestige then
-		self.SSIPrestigeButton:SetCheck(true)
-	elseif tracked == Money.CodeEnumCurrencyType.Renown then
-		self.SSIRenownButton:SetCheck(true)
-	elseif tracked == Money.CodeEnumCurrencyType.CraftingVouchers then
-		self.SSICraftingVouchersButton:SetCheck(true)
-	end
+	self.SSICashButton:SetCheck(tracked[1])
+	self.SSIRenownButton:SetCheck(tracked[2])
+	self.SSIElderGemsButton:SetCheck(tracked[3])
+	self.SSIGloryButton:SetCheck(tracked[4])
+	self.SSIPrestigeButton:SetCheck(tracked[5])
+	self.SSICraftingVouchersButton:SetCheck(tracked[6])
+	self.SSIOmnibitsButtonButton:SetCheck(tracked[7])
+	self.SSIServiceTokensButton:SetCheck(tracked[8])
+	self.SSIFortuneCoinsButton:SetCheck(tracked[9])
 end
 
 function Addon:OnInventoryIconsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )

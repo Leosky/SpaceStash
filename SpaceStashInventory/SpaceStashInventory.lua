@@ -19,7 +19,8 @@ local MAJOR, MINOR = "SpaceStashInventory", 22
 -- Libraries
 -----------------------------------------------------------------------------------------------
 local GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
-local Addon, glog = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(MAJOR)
+local GeminiHook = Apollo.GetPackage("Gemini:Hook-1.0").tPackage
+local Addon, glog = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(MAJOR, false, {}, "Gemini:Hook-1.0")
 local L = GeminiLocale:GetLocale(MAJOR, true)
 
 local tItemSlotBGPixie = {loc = {fPoints = {0,0,1,10},nOffsets = {0,0,0,0},},strSprite="WhiteFill", cr= "black",fRotation="0"}
@@ -39,10 +40,33 @@ defaults.profile.version.MAJOR = MAJOR
 defaults.profile.version.MINOR = MINOR
 defaults.profile.config.IconSize = 36
 defaults.profile.config.RowSize = 10
-defaults.profile.config.CurrenciesMicroMenu = { anchors = {-207, -171, -6, -5} }
+defaults.profile.config.CurrenciesMicroMenu = { anchors = {0, -271, 200, 0} }
 defaults.profile.config.SplitWindow = { anchors = {0, 75, 164, 125} }
-defaults.profile.config.currencies = {}
-defaults.profile.config.currencies[Money.CodeEnumCurrencyType.Credits] = true
+function pairsByKeys (t, f)
+  local a = {}
+  for n in pairs(t) do table.insert(a, n) end
+  table.sort(a, f)
+  local i = 0      -- iterator variable
+  local iter = function ()   -- iterator function
+    i = i + 1
+    if a[i] == nil then return nil
+    else return a[i], t[a[i]]
+    end
+  end
+  return iter
+end
+
+defaults.profile.config.currencies = {
+	[1] = true,
+	[2] = false,
+	[3] = false,
+	[4] = false,
+	[5] = false,
+	[6] = false,
+	[7] = false,
+	[8] = false,
+	[9] = false
+}
 defaults.profile.config.SelectedTab = Addon.CodeEnumTabDisplay.BagsTab
 defaults.profile.config.DisplayNew = false
 
@@ -54,6 +78,17 @@ local _tLoadingInfo = {
 
 local tCurrenciesWindows = {}
 local nCurrenciesWindowsSize = 0
+local currencies = {
+    [1] = {eType = Money.CodeEnumCurrencyType.Credits                   , name = Apollo.GetString("CRB_Cash")                         , desc = "moneymoney"},
+    [2] = {eType = Money.CodeEnumCurrencyType.Renown                    , name = Apollo.GetString("CRB_Renown")                       , desc = Apollo.GetString("CRB_Renown_desc")},
+    [3] = {eType = Money.CodeEnumCurrencyType.ElderGems                 , name = Apollo.GetString("CRB_Elder_Gems")                   , desc = Apollo.GetString("CRB_Elder_Gems_desc")},
+    [4] = {eType = Money.CodeEnumCurrencyType.Glory                     , name = Apollo.GetString("CRB_Glory")                        , desc = Apollo.GetString("CRB_Glory_desc")},
+    [5] = {eType = Money.CodeEnumCurrencyType.Prestige                  , name = Apollo.GetString("CRB_Prestige")                     , desc = Apollo.GetString("CRB_Prestige_desc")},
+    [6] = {eType = Money.CodeEnumCurrencyType.CraftingVouchers          , name = Apollo.GetString("CRB_Crafting_Vouchers")            , desc = Apollo.GetString("CRB_Crafting_Vouchers_desc")},
+    [7] = {eType = AccountItemLib.CodeEnumAccountCurrency.Omnibits      , name = Apollo.GetString("CRB_OmniBits")                     , desc = Apollo.GetString("CRB_OmniBits_desc"), account = true, capped = true},
+    [8] = {eType = AccountItemLib.CodeEnumAccountCurrency.ServiceToken  , name = Apollo.GetString("AccountInventory_ServiceToken")    , desc = Apollo.GetString("AccountInventory_ServiceToken_desc"), account = true},
+    [9] = {eType = AccountItemLib.CodeEnumAccountCurrency.MysticShiny   , name = Apollo.GetString("CRB_FortuneCoin")                  , desc = Apollo.GetString("CRB_FortuneCoin_desc"), account = true},
+}
 
 -----------------------------------------------------------------------------------------------
 -- SSI Base GeminiAddon behaviors
@@ -66,7 +101,7 @@ function Addon:OnInitialize()
 	glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
 		level = "INFO",
 		pattern = "%d [%c:%n] %l - %m",
-		appender = "GeminiConsole"
+		appender = "print"
 	})
 	
 	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
@@ -75,7 +110,7 @@ function Addon:OnInitialize()
 	Apollo.RegisterEventHandler("AddonFullyLoaded","OnAddonFullyLoaded", self) -- spacestash
 	Apollo.RegisterEventHandler("InterfaceMenu_ToggleInventory", "OnVisibilityToggle", self)
 	Apollo.RegisterSlashCommand("ssi", "OnSlashCommand", self)
-	
+
 end
 
 function Addon:OnEnable()
@@ -83,7 +118,39 @@ function Addon:OnEnable()
 
 	self.xmlDoc = XmlDoc.CreateFromFile("SpaceStashInventory.xml")
 	self.xmlDoc:RegisterCallback("OnDocumentReady", self)
+	self:RawHook(Apollo.GetAddon("Inventory"),"OnGenerateTooltip")
 
+	for i = 1, #currencies do
+    	if currencies[i].account then 
+    		currencies[i].currencyObject = AccountItemLib.GetAccountCurrency(currencies[i].eType)
+    	else
+    		currencies[i].currencyObject = GameLib.GetPlayerCurrency(currencies[i].eType)
+    	end
+    end
+
+    self:RawHook(Apollo.GetAddon("Inventory"),"OnToggleVisibility")
+    self:RawHook(Apollo.GetAddon("Inventory"),"OnSupplySatchelOpen")
+    self:RawHook(Apollo.GetAddon("Inventory"),"OnSupplySatchelClosed")
+    self:RawHook(Apollo.GetAddon("Inventory"),"OnToggleVisibilityAlways")
+    self:RawHook(Apollo.GetAddon("Inventory"),"OnGenericEvent_SplitItemStack")
+end
+
+
+--Hooked function
+function Addon:OnToggleVisibility()
+	return
+end
+function Addon:OnSupplySatchelOpen()
+	return
+end
+function Addon:OnSupplySatchelClosed()
+	return
+end
+function Addon:OnToggleVisibilityAlways()
+	return
+end
+function Addon:OnGenericEvent_SplitItemStack()
+	return
 end
 
 function Addon:OnDocumentReady()
@@ -131,11 +198,15 @@ function Addon:OnDocumentReady()
 
 	self.wndCurrenciesMicroMenu = self.wndMain:FindChild("SSICurenciesMicroMenu")
 	self.wndCurrenciesMicroMenu:Show(false,true)
-	self.SSICashButton = self.wndCurrenciesMicroMenu:FindChild("SSICashButton")
-	self.SSIElderGemsButton = self.wndCurrenciesMicroMenu:FindChild("SSIElderGemsButton")
-	self.SSIPrestigeButton = self.wndCurrenciesMicroMenu:FindChild("SSIPrestigeButton")
-	self.SSIRenownButton = self.wndCurrenciesMicroMenu:FindChild("SSIRenownButton")
-	self.SSICraftingVouchersButton = self.wndCurrenciesMicroMenu:FindChild("SSICraftingVouchersButton")
+	self.SSICashButton 					= self.wndCurrenciesMicroMenu:FindChild("SSICashButton")
+	self.SSIRenownButton 				= self.wndCurrenciesMicroMenu:FindChild("SSIRenownButton")
+	self.SSIElderGemsButton 			= self.wndCurrenciesMicroMenu:FindChild("SSIElderGemsButton")
+	self.SSIGloryButton 				= self.wndCurrenciesMicroMenu:FindChild("SSIGloryButton")
+	self.SSIPrestigeButton 				= self.wndCurrenciesMicroMenu:FindChild("SSIPrestigeButton")
+	self.SSICraftingVouchersButton 		= self.wndCurrenciesMicroMenu:FindChild("SSICraftingVouchersButton")
+	self.SSIOmnibitsButton 				= self.wndCurrenciesMicroMenu:FindChild("SSIOmnibitsButton")
+	self.SSIServicetokenButton 			= self.wndCurrenciesMicroMenu:FindChild("SSIServicetokenButton")
+	self.SSIFortunecoinButton 			= self.wndCurrenciesMicroMenu:FindChild("SSIFortunecoinButton")
 
 	self.btnSalvage = self.wndBottomFrame:FindChild("SpaceStashInventorySalvageButton")
 	self.btnSalvage:SetTooltip(L["SALVAGEALLBUTTON"])
@@ -191,6 +262,7 @@ function Addon:OnDocumentReady()
 
 	
 	Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
+	Apollo.RegisterEventHandler("AccountCurrencyChanged", "OnPlayerCurrencyChanged", self)
 	Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "Redraw", self)
 
 	Apollo.RegisterEventHandler("GuildBank_ShowPersonalInventory", "OnVisibilityToggle", self)
@@ -221,13 +293,16 @@ function Addon:OnDocumentReady()
 		self.db.profile.config.SplitWindow.anchors[3],
 		self.db.profile.config.SplitWindow.anchors[4])
 
+
+
 	self:FinalizeLoading();
 end
 
 function Addon:FinalizeLoading()
 	self._tLoadingInfo.GUI.isReady = true;
 	if self._tLoadingInfo.WindowManagement.isReady and not self._tLoadingInfo.WindowManagement.isInit then
-		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR})
+		Event_FireGenericEvent("WindowManagementRegister", {strName = MAJOR, nSaveVersion=MINOR})
+		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR, nSaveVersion=MINOR})
 		self._tLoadingInfo.WindowManagement.isInit = true
 	end
  
@@ -242,20 +317,20 @@ end
 function Addon:OnWindowManagementReady()
 	self._tLoadingInfo.WindowManagement.isReady = true
 	if self._tLoadingInfo.GUI.isReady then
-		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR})
+		Event_FireGenericEvent("WindowManagementRegister", {strName = MAJOR, nSaveVersion=MINOR})
+		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR, nSaveVersion=MINOR})
+
 		self._tLoadingInfo.WindowManagement.isInit = true
 	end
  
 end
 
 function Addon:OnInterfaceMenuListHasLoaded()
-	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", Apollo.GetString("InterfaceMenu_Inventory"), {"InterfaceMenu_ToggleInventory", "Inventory", ""})
+	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", Apollo.GetString("InterfaceMenu_Inventory"), {"InterfaceMenu_ToggleInventory", "Inventory", "Icon_Windows32_UI_CRB_InterfaceMenu_Inventory"})
 end
 
 function Addon:OnAddonFullyLoaded(args)
-	if args.strName == "Rover" then
-		Event_FireGenericEvent("SendVarToRover", MAJOR, self)
-	elseif args.strName == "SpaceStashCore" then
+	if args.strName == "SpaceStashCore" then
 		self._tLoadingInfo.SpaceStashCore.isReady = true
 		self:InitSpaceStashCore()
 	end
@@ -266,6 +341,7 @@ function Addon:InitSpaceStashCore()
 	-- TODO: a way to defer SSI fully loaded to SSC (for senor plow modification).
  
 	self._tLoadingInfo.SpaceStashCore.isInit = true
+	Event_FireGenericEvent("SendVarToRover", MAJOR, self)
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -280,6 +356,8 @@ function Addon:OnSlashCommand(strCommand, strParam)
 		glog:info(self)
 	elseif strParam == "redraw" then
 		self:Redraw()
+	elseif strParam == "reset" then
+		self:ResetConfig()
 	end
 end
 
@@ -292,6 +370,7 @@ function Addon:CloseInventory()
 	--TODO: implement 'standby mode' to use less perf.
 	self.wndMain:Show(false,true)
 	self.wndBagWindow:MarkAllItemsAsSeen()
+
 	Sound.Play(Sound.PlayUIBagClose) --CUSTOM: chosable sound
 end
 
@@ -307,6 +386,7 @@ function Addon:OpenInventory()
 	self:OnInventoryDisplayChange()
 	self:UpdateCashAmount()
 	self.wndMain:Show(true,true)
+	self.wndMain:ToFront()
 	Sound.Play(Sound.PlayUIBagOpen) --CUSTOM: chosable sound
 end
 
@@ -331,45 +411,8 @@ function Addon:OnChallengeUpdated()
 	self:UpdateVirtualItemInventory()
 end
 
-function Addon:UpdateVirtualItemInventory()
-	local tVirtualItems = Item.GetVirtualItems()
-	local bThereAreItems = #tVirtualItems > 0
-
-	local wndVirtalItemsFrame = self.wndMain:FindChild("VirtualItemsTabFrame")
-	wndVirtalItemsFrame:SetData(#tVirtualItems)
-
-	if not bThereAreItems then
-
-	elseif wndVirtalItemsFrame:GetData() == 0 then
-
-	end
-
-	-- Draw items
-	wndVirtalItemsFrame:DestroyChildren()
-	local nOnGoingCount = 0
-	for key, tCurrItem in pairs(tVirtualItems) do
-		local wndCurr = Apollo.LoadForm(self.xmlDoc, "VirtualItem", wndVirtalItemsFrame, self)
-		if tCurrItem.nCount > 1 then
-			wndCurr:FindChild("_Count"):SetText(tCurrItem.nCount)
-		end
-		nOnGoingCount = nOnGoingCount + tCurrItem.nCount
-		wndCurr:FindChild("_Item"):SetSprite(tCurrItem.strIcon)
-		wndCurr:SetTooltip(string.format("<P Font=\"CRB_InterfaceSmall\">%s</P><P Font=\"CRB_InterfaceSmall\" TextColor=\"aaaaaaaa\">%s</P>", tCurrItem.strName, tCurrItem.strFlavor))
-	end
-	
-	-- Adjust heights
-	if not self.nQuestItemContainerHeight then
-		local nLeft, nTop, nRight, nBottom = wndVirtalItemsFrame:GetAnchorOffsets()
-		self.nQuestItemContainerHeight = nBottom - nTop
-	end
-
-	wndVirtalItemsFrame:SetAnchorOffsets(2,38,0,self.nQuestItemContainerHeight)
-
-	self:Redraw()
-end
-
 function Addon:OnOptions()
-  Event_FireGenericEvent("SpaceStashCore_OpenOptions", self)
+  Event_FireGenericEvent("SpaceStashCore_OpenOptions")
 end
 
 -- When the SalvageButton is pressed.
@@ -380,7 +423,9 @@ function Addon:OnSalvageButton()
 end
 
 function Addon:OnTradskillStashButton()
-	Event_FireGenericEvent("ToggleTradeskillInventoryFromBag")
+	local tAnchors = {}
+	tAnchors.nLeft, tAnchors.nTop, tAnchors.nRight, tAnchors.nBottom = self.wndMain:GetAnchorOffsets()
+	Event_FireGenericEvent("ToggleTradeskillInventoryFromBag", tAnchors)
 end
 
 function Addon:RowSizeChange(nNewValue)
@@ -522,6 +567,43 @@ function Addon:OnShowBagsTab()
 	end
 end
 
+--[[
+function Addon:UpdateVirtualItemInventory()
+	local tVirtualItems = Item.GetVirtualItems()
+	local bThereAreItems = #tVirtualItems > 0
+
+	local wndVirtalItemsFrame = self.wndMain:FindChild("VirtualItemsTabFrame")
+	wndVirtalItemsFrame:SetData(#tVirtualItems)
+
+	if not bThereAreItems then
+
+	elseif wndVirtalItemsFrame:GetData() == 0 then
+
+	end
+
+	-- Draw items
+	wndVirtalItemsFrame:DestroyChildren()
+	local nOnGoingCount = 0
+	for key, tCurrItem in pairs(tVirtualItems) do
+		local wndCurr = Apollo.LoadForm(self.xmlDoc, "VirtualItem", wndVirtalItemsFrame, self)
+		if tCurrItem.nCount > 1 then
+			wndCurr:FindChild("_Count"):SetText(tCurrItem.nCount)
+		end
+		nOnGoingCount = nOnGoingCount + tCurrItem.nCount
+		wndCurr:FindChild("_Item"):SetSprite(tCurrItem.strIcon)
+		wndCurr:SetTooltip(string.format("<P Font=\"CRB_InterfaceSmall\">%s</P><P Font=\"CRB_InterfaceSmall\" TextColor=\"aaaaaaaa\">%s</P>", tCurrItem.strName, tCurrItem.strFlavor))
+	end
+	
+	-- Adjust heights
+	if not self.nQuestItemContainerHeight then
+		local nLeft, nTop, nRight, nBottom = wndVirtalItemsFrame:GetAnchorOffsets()
+		self.nQuestItemContainerHeight = nBottom - nTop
+	end
+
+	wndVirtalItemsFrame:SetAnchorOffsets(2,38,0,self.nQuestItemContainerHeight)
+
+	self:Redraw()
+end
 
 function Addon:OnShowVirtualItemsTab(wndHandler, wndControl, eMouseButton )
 	if self.db.profile.config.SelectedTab == Addon.CodeEnumTabDisplay.VirtualItemsTab then
@@ -551,7 +633,7 @@ function Addon:OnShowTradeskillsBagTab(wndHandler, wndControl, eMouseButton )
 		self.wndTradeskillsBagTabFrame:Show(true)
 		self:Redraw()
 	end
-end
+end]]
 
 function Addon:OnTabUnshow(wndHandler, wndControl, eMouseButton )
 
@@ -589,23 +671,23 @@ end
 -- Currencies functions and events
 -----------------------------------------------------------------------------------------------
 
-function Addon:AddTrackedCurrency(eCurrencyType)
-    self.db.profile.config.currencies[eCurrencyType] = true
+function Addon:AddTrackedCurrency(idx)
+    self.db.profile.config.currencies[idx] = true
 
     self:UpdateCashAmount()
     self:UpdateTrackedCurrencies()
     self:UpdateCurrenciesMicroMenu()
 end
 
-function Addon:RemoveTrackedCurrency(eCurrencyType)
-    self.db.profile.config.currencies[eCurrencyType] = false
+function Addon:RemoveTrackedCurrency(idx)
+    self.db.profile.config.currencies[idx] = false
 
     self:UpdateTrackedCurrencies()
     self:UpdateCurrenciesMicroMenu()
 end
 
-function Addon:SetTrackedCurrency(eCurrencyType, bTrack)
-    self.db.profile.config.currencies[eCurrencyType] = bTrack
+function Addon:SetTrackedCurrency(idx, bTrack)
+    self.db.profile.config.currencies[idx] = bTrack
 
     self:UpdateCashAmount()
     self:UpdateTrackedCurrencies()
@@ -614,17 +696,26 @@ end
 
 --- This function update the checked / unchecked state of the right clic menu
 function Addon:UpdateCurrenciesMicroMenu()
-    self.SSICashButton:SetCheck(self.db.profile.config.currencies[Money.CodeEnumCurrencyType.Credits])
-    self.SSIElderGemsButton:SetCheck(self.db.profile.config.currencies[Money.CodeEnumCurrencyType.ElderGems])
-    self.SSIPrestigeButton:SetCheck(self.db.profile.config.currencies[Money.CodeEnumCurrencyType.Prestige])
-    self.SSIRenownButton:SetCheck(self.db.profile.config.currencies[Money.CodeEnumCurrencyType.Renown])
-    self.SSICraftingVouchersButton:SetCheck(self.db.profile.config.currencies[Money.CodeEnumCurrencyType.CraftingVouchers])
+	self.SSICashButton:SetCheck(self.db.profile.config.currencies[1])
+	self.SSIRenownButton:SetCheck(self.db.profile.config.currencies[2]) 
+	self.SSIElderGemsButton:SetCheck(self.db.profile.config.currencies[3]) 
+	self.SSIGloryButton:SetCheck(self.db.profile.config.currencies[4]) 
+	self.SSIPrestigeButton:SetCheck(self.db.profile.config.currencies[5]) 
+	self.SSICraftingVouchersButton:SetCheck(self.db.profile.config.currencies[6])
+	self.SSIOmnibitsButton:SetCheck(self.db.profile.config.currencies[7])
+	self.SSIServicetokenButton:SetCheck(self.db.profile.config.currencies[8])
+	self.SSIFortunecoinButton:SetCheck(self.db.profile.config.currencies[9])
+
+	if self._tLoadingInfo.SpaceStashCore.isInit then 
+		self._tLoadingInfo.SpaceStashCore.instance:UpdateTrackedCurrency();
+	end
+	
 end
 
 
-function Addon:GetTrackedCurrency(eCurrencyType)
-    if not eCurrencyType then return self.db.profile.config.currencies end
-	return self.db.profile.config.currencies[eCurrencyType]
+function Addon:GetTrackedCurrency(idx)
+    if not idx then return self.db.profile.config.currencies end
+	return self.db.profile.config.currencies[idx]
 end
 
 
@@ -639,31 +730,47 @@ function Addon:OnOpenCurrenciesMenu(wndHandler, wndControl, eMouseButton)
 end
 
 function Addon:OnDropdownButtonCheck(wndHandler, wndControl, eMouseButton)
-  if wndHandler == self.SSICashButton then
-    self:AddTrackedCurrency(Money.CodeEnumCurrencyType.Credits)
-  elseif wndHandler == self.SSIElderGemsButton then
-    self:AddTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems)
-  elseif wndHandler == self.SSIPrestigeButton then
-    self:AddTrackedCurrency(Money.CodeEnumCurrencyType.Prestige)
-  elseif wndHandler == self.SSIRenownButton then
-    self:AddTrackedCurrency(Money.CodeEnumCurrencyType.Renown)
-  elseif wndHandler == self.SSICraftingVouchersButton then
-    self:AddTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers)
-  end
+	if wndHandler == self.SSICashButton then
+		self:AddTrackedCurrency(1)
+	elseif wndHandler == self.SSIRenownButton then
+		self:AddTrackedCurrency(2)
+	elseif wndHandler == self.SSIElderGemsButton then
+		self:AddTrackedCurrency(3)
+	elseif wndHandler == self.SSIGloryButton then
+		self:AddTrackedCurrency(4)
+	elseif wndHandler == self.SSIPrestigeButton then
+		self:AddTrackedCurrency(5)
+	elseif wndHandler == self.SSICraftingVouchersButton then
+		self:AddTrackedCurrency(6)
+	elseif wndHandler == self.SSIOmnibitsButton then
+		self:AddTrackedCurrency(7)
+	elseif wndHandler == self.SSIServicetokenButton then
+		self:AddTrackedCurrency(8)
+	elseif wndHandler == self.SSIFortunecoinButton then
+		self:AddTrackedCurrency(9)
+	end
 end
 
 function Addon:OnDropdownButtonUncheck(wndHandler, wndControl, eMouseButton)
-    if wndHandler == self.SSICashButton then
-        self:RemoveTrackedCurrency(Money.CodeEnumCurrencyType.Credits)
-    elseif wndHandler == self.SSIElderGemsButton then
-        self:RemoveTrackedCurrency(Money.CodeEnumCurrencyType.ElderGems)
-    elseif wndHandler == self.SSIPrestigeButton then
-        self:RemoveTrackedCurrency(Money.CodeEnumCurrencyType.Prestige)
-    elseif wndHandler == self.SSIRenownButton then
-        self:RemoveTrackedCurrency(Money.CodeEnumCurrencyType.Renown)
-    elseif wndHandler == self.SSICraftingVouchersButton then
-        self:RemoveTrackedCurrency(Money.CodeEnumCurrencyType.CraftingVouchers)
-    end
+	if wndHandler == self.SSICashButton then
+		self:RemoveTrackedCurrency(1)
+	elseif wndHandler == self.SSIRenownButton then
+		self:RemoveTrackedCurrency(2)
+	elseif wndHandler == self.SSIElderGemsButton then
+		self:RemoveTrackedCurrency(3)
+	elseif wndHandler == self.SSIGloryButton then
+		self:RemoveTrackedCurrency(4)
+	elseif wndHandler == self.SSIPrestigeButton then
+		self:RemoveTrackedCurrency(5)
+	elseif wndHandler == self.SSICraftingVouchersButton then
+		self:RemoveTrackedCurrency(6)
+	elseif wndHandler == self.SSIOmnibitsButton then
+		self:RemoveTrackedCurrency(7)
+	elseif wndHandler == self.SSIServicetokenButton then
+		self:RemoveTrackedCurrency(8)
+	elseif wndHandler == self.SSIFortunecoinButton then
+		self:RemoveTrackedCurrency(9)
+	end
 end
 
 function Addon:UpdateTrackedCurrencies()
@@ -677,7 +784,7 @@ function Addon:UpdateTrackedCurrencies()
         tCurrenciesWindows[k] = nil
     end
 
-    if self.db.profile.config.currencies[Money.CodeEnumCurrencyType.Credits] == true then
+    if self.db.profile.config.currencies[1] == true then
         self.wndCash:SetAnchorOffsets(0,-20,0,0)
         self.CurrenciesContainer:SetAnchorOffsets(0,0,0,-20)
         self.wndCash:Show(true,true)
@@ -687,44 +794,20 @@ function Addon:UpdateTrackedCurrencies()
         self.wndCash:Show(false,true)
     end
 
-    if self.db.profile.config.currencies[Money.CodeEnumCurrencyType.ElderGems] == true then
-        if not tCurrenciesWindows[Money.CodeEnumCurrencyType.ElderGems] then
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.ElderGems] = Apollo.LoadForm(self.xmlDoc, "_CurrencyWindow", targetColumn, self)
-            if targetColumn == rightColumn then targetColumn = leftColumn else targetColumn = rightColumn end
-
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.ElderGems]:SetName("ElderGems_CurrencyWindow")
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.ElderGems]:SetMoneySystem(Money.CodeEnumCurrencyType.ElderGems)
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.ElderGems]:SetAmount(GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.ElderGems):GetAmount(), true)
-        end
-    end
-
-    if self.db.profile.config.currencies[Money.CodeEnumCurrencyType.Prestige] == true then
-        if not tCurrenciesWindows[Money.CodeEnumCurrencyType.Prestige] then
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.Prestige] = Apollo.LoadForm(self.xmlDoc, "_CurrencyWindow", targetColumn, self)
-            if targetColumn == rightColumn then targetColumn = leftColumn else targetColumn = rightColumn end
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.Prestige]:SetName("Prestige_CurrencyWindow")
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.Prestige]:SetMoneySystem(Money.CodeEnumCurrencyType.Prestige)
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.Prestige]:SetAmount(GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.Prestige):GetAmount(), true)
-        end
-    end
-
-    if self.db.profile.config.currencies[Money.CodeEnumCurrencyType.Renown] == true then
-        if not tCurrenciesWindows[Money.CodeEnumCurrencyType.Renown] then
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.Renown] = Apollo.LoadForm(self.xmlDoc, "_CurrencyWindow", targetColumn, self)
-            if targetColumn == rightColumn then targetColumn = leftColumn else targetColumn = rightColumn end
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.Renown]:SetName("Renown_CurrencyWindow")
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.Renown]:SetMoneySystem(Money.CodeEnumCurrencyType.Renown)
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.Renown]:SetAmount(GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.Renown):GetAmount(), true)
-        end
-    end
-
-    if self.db.profile.config.currencies[Money.CodeEnumCurrencyType.CraftingVouchers] == true then
-        if not tCurrenciesWindows[Money.CodeEnumCurrencyType.CraftingVouchers] then
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.CraftingVouchers] = Apollo.LoadForm(self.xmlDoc, "_CurrencyWindow", targetColumn, self)
-            if targetColumn == rightColumn then targetColumn = leftColumn else targetColumn = rightColumn end
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.CraftingVouchers]:SetName("CraftingVouchers_CurrencyWindow")
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.CraftingVouchers]:SetMoneySystem(Money.CodeEnumCurrencyType.CraftingVouchers)
-            tCurrenciesWindows[Money.CodeEnumCurrencyType.CraftingVouchers]:SetAmount(GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.CraftingVouchers):GetAmount(), true)
+    for k,v in pairs(currencies) do
+        if k ~= 1 and self.db.profile.config.currencies[k] then
+        	if not tCurrenciesWindows[k] then
+	            tCurrenciesWindows[k] = Apollo.LoadForm(self.xmlDoc, "_CurrencyWindow", targetColumn, self)
+	            if targetColumn == rightColumn then targetColumn = leftColumn else targetColumn = rightColumn end
+	            tCurrenciesWindows[k]:SetName("CurrencyWindow_" .. k)
+	            if currencies[k].account then 
+	            	tCurrenciesWindows[k]:SetMoneySystem(Money.CodeEnumCurrencyType.GroupCurrency, 0, 0, currencies[k].eType)
+	            	tCurrenciesWindows[k]:SetAmount(currencies[k].currencyObject:GetAmount(), true)
+	            else
+	            	tCurrenciesWindows[k]:SetMoneySystem(currencies[k].eType)
+	            	tCurrenciesWindows[k]:SetAmount(currencies[k].currencyObject:GetAmount(), true)
+	            end
+	        end
         end
     end
 
@@ -745,9 +828,11 @@ function Addon:UpdateTrackedCurrencies()
         self.CurrencyMenuButton:Show(false,true)
     end
 
-
-
     self:UpdateBottomFrameSize()
+
+    if self._tLoadingInfo.SpaceStashCore.isInit then 
+		self._tLoadingInfo.SpaceStashCore.instance:UpdateTrackedCurrency();
+	end
 end
 
 function Addon:OnCloseCurrenciesMicroMenu()
@@ -770,18 +855,22 @@ function Addon:OnSplitWindowMove()
 end
 
 function Addon:UpdateCashAmount()
-    self.wndCurrencies:SetTooltip(string.format(L["CurrenciesTooltip"],
-        GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.ElderGems):GetAmount(),
-        GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.Prestige):GetAmount(),
-        GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.Renown):GetAmount(),
-        GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.CraftingVouchers):GetAmount()))
+    --[[self.wndCurrencies:SetTooltip(string.format(currenciesTooltipPrototype,
+        GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.Credits):GetAmount(),
+		GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.Renown):GetAmount(),
+		GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.ElderGems):GetAmount(),
+		GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.Glory):GetAmount(),
+		GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.Prestige):GetAmount(),
+		GameLib.GetPlayerCurrency(Money.CodeEnumCurrencyType.CraftingVouchers):GetAmount(),
+		AccountItemLib.GetAccountCurrency(AccountItemLib.CodeEnumAccountCurrency.Omnibits):GetAmount(),0,0,
+		AccountItemLib.GetAccountCurrency(AccountItemLib.CodeEnumAccountCurrency.ServiceToken):GetAmount(),
+		AccountItemLib.GetAccountCurrency(AccountItemLib.CodeEnumAccountCurrency.MysticShiny):GetAmount()))]]
 
-    self.wndCash:SetAmount(GameLib.GetPlayerCurrency(), true)
+    self.wndCash:SetAmount(currencies[1].currencyObject:GetAmount(), true)
 
     for k, v in pairs(tCurrenciesWindows) do
-        v:SetAmount(GameLib.GetPlayerCurrency(k):GetAmount())
+        if k ~= 1 then v:SetAmount(currencies[k].currencyObject:GetAmount()) end
     end
-
 end
 
 -----------------------------------------------------------------------------------------------
