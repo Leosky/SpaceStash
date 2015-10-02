@@ -1,7 +1,7 @@
 require "Apollo"
 
 -- Create the addon object and register it with Apollo in a single line.
-local MAJOR, MINOR = "SpaceStashCore", 13
+local MAJOR, MINOR = "SpaceStashCore", 14
 
 -----------------------------------------------------------------------------------------------
 -- Libraries
@@ -293,7 +293,8 @@ function Addon:FinalizeLoading()
 	self._tLoadingInfo.GUI.isReady = true;
 
 	if self._tLoadingInfo.WindowManagement.isReady then
-		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR})
+        Event_FireGenericEvent("WindowManagementRegister", {strName = MAJOR, nSaveVersion=MINOR})
+        Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR, nSaveVersion=MINOR})
 		self._tLoadingInfo.WindowManagement.isInit = true
 	end
  
@@ -312,7 +313,8 @@ end
 function Addon:OnWindowManagementReady()
 	self._tLoadingInfo.WindowManagement.isReady = true
 	if self._tLoadingInfo.GUI.isReady then
-		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR})
+        Event_FireGenericEvent("WindowManagementRegister", {strName = MAJOR, nSaveVersion=MINOR})
+        Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR, nSaveVersion=MINOR})
 		self._tLoadingInfo.WindowManagement.isInit = true
 	end
  
@@ -390,32 +392,13 @@ end
 function Addon:OnOpenOptions( oHandler )
 	self.wndMain:Show(true,true)
 
-	if oHandler == SpaceStashBank then
-		self.btnSSBOptions:SetCheck(true)
-		self:SpaceStashBankButtonCheck()
+	self.btnSSCOptions:SetCheck(true)
+	self:SpaceStashCoreButtonCheck()
 
-		self.btnSSIOptions:SetCheck(false)
-		self.btnSSCOptions:SetCheck(false)
-		Addon:SpaceStashCoreButtonUncheck()
-		Addon:SpaceStashInventoryButtonUncheck()
-	elseif oHandler == SpaceStashInventory then
-
-		self.btnSSIOptions:SetCheck(true)
-		self:SpaceStashInventoryButtonCheck()
-
-		self.btnSSCOptions:SetCheck(false)
-		self.btnSSBOptions:SetCheck(false)
-		Addon:SpaceStashCoreButtonUncheck()
-		Addon:SpaceStashBankButtonUncheck()
-	else
-		self.btnSSCOptions:SetCheck(true)
-		self:SpaceStashCoreButtonCheck()
-
-		self.btnSSIOptions:SetCheck(false)
-		self.btnSSBOptions:SetCheck(false)
-		Addon:SpaceStashInventoryButtonUncheck()
-		Addon:SpaceStashBankButtonUncheck()
-	end
+	self.btnSSIOptions:SetCheck(false)
+	self.btnSSBOptions:SetCheck(false)
+	Addon:SpaceStashInventoryButtonUncheck()
+	Addon:SpaceStashBankButtonUncheck()
 end
 
 function Addon:OnClose( ... )
@@ -476,6 +459,7 @@ function Addon:SpaceStashBankButtonUncheck()
 end
 
 function Addon:OnCurrencySelectionChange(wndHandler, wndControl, eMouseButton)
+    if not self._tLoadingInfo.SpaceStashInventory.isInit then return end
 	if wndHandler == self.SSICashButton then
 		SpaceStashInventory:SetTrackedCurrency(1, self.SSICashButton:IsChecked())
 	elseif wndHandler == self.SSIRenownButton then
@@ -498,7 +482,7 @@ function Addon:OnCurrencySelectionChange(wndHandler, wndControl, eMouseButton)
 end
 
 function Addon:UpdateTrackedCurrency()
-
+    if not self._tLoadingInfo.SpaceStashInventory.isInit then return end
 	local tracked = SpaceStashInventory:GetTrackedCurrency()
 	self.SSICashButton:SetCheck(tracked[1])
 	self.SSIRenownButton:SetCheck(tracked[2])
@@ -510,40 +494,47 @@ function Addon:UpdateTrackedCurrency()
 	self.SSIServiceTokensButton:SetCheck(tracked[8])
 	self.SSIFortuneCoinsButton:SetCheck(tracked[9])
 end
-
+	
 function Addon:OnInventoryIconsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
-  SpaceStashInventory:SetIconsSize(fNewValue)
-  self.SSIIconsSizeText:SetText(fNewValue)
+    if not self._tLoadingInfo.SpaceStashInventory.isInit then return end
+    SpaceStashInventory:SetIconsSize(fNewValue)
+    self.SSIIconsSizeText:SetText(fNewValue)
 end 
 
 function Addon:UpdateInventoryIconsSize()
-  self.SSIIconsSizeSlider:SetValue(SpaceStashInventory:GetIconsSize())
-  self.SSIIconsSizeText:SetText(SpaceStashInventory:GetIconsSize())
+    if not self._tLoadingInfo.SpaceStashInventory.isInit then return end
+    self.SSIIconsSizeSlider:SetValue(SpaceStashInventory:GetIconsSize())
+    self.SSIIconsSizeText:SetText(SpaceStashInventory:GetIconsSize())
 end
 
 function Addon:OnInventoryRowsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
-  SpaceStashInventory:SetRowsSize(fNewValue)
-  self.SSIRowsSizeText:SetText(fNewValue)
+    if not self._tLoadingInfo.SpaceStashInventory.isInit then return end
+    SpaceStashInventory:SetRowsSize(fNewValue)
+    self.SSIRowsSizeText:SetText(fNewValue)
 end 
 
 function Addon:UpdateInventoryRowsSize()
-  self.SSIRowsSizeSlider:SetValue(SpaceStashInventory:GetRowsSize())
-  self.SSIRowsSizeText:SetText(SpaceStashInventory:GetRowsSize())
+    if not self._tLoadingInfo.SpaceStashInventory.isInit then return end
+    self.SSIRowsSizeSlider:SetValue(SpaceStashInventory:GetRowsSize())
+    self.SSIRowsSizeText:SetText(SpaceStashInventory:GetRowsSize())
 end
 
 function Addon:OnBankIconsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
-  SpaceStashBank:SetIconsSize(fNewValue)
-  self.SSBIconsSizeText:SetText(fNewValue)
+    if not self._tLoadingInfo.SpaceStashBank.isInit then return end
+    SpaceStashBank:SetIconsSize(fNewValue)
+    self.SSBIconsSizeText:SetText(fNewValue)
 end 
 
 function Addon:UpdateBankIconsSize()
-  self.SSBIconsSizeSlider:SetValue(SpaceStashBank:GetIconsSize())
-  self.SSBIconsSizeText:SetText(SpaceStashBank:GetIconsSize())
+    if not self._tLoadingInfo.SpaceStashBank.isInit then return end
+    self.SSBIconsSizeSlider:SetValue(SpaceStashBank:GetIconsSize())
+    self.SSBIconsSizeText:SetText(SpaceStashBank:GetIconsSize())
 end
 
 function Addon:OnBankRowsSizeChanged( wndHandler, wndControl, fNewValue, fOldValue )
-  SpaceStashBank:SetRowsSize(fNewValue)
-  self.SSBRowsSizeText:SetText(fNewValue)
+    if not self._tLoadingInfo.SpaceStashBank.isInit then return end
+    SpaceStashBank:SetRowsSize(fNewValue)
+    self.SSBRowsSizeText:SetText(fNewValue)
 end 
 
 -------------------------------------------------------------------------------------
