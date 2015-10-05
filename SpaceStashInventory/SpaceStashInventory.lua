@@ -95,7 +95,7 @@ local currencies = {
 -----------------------------------------------------------------------------------------------
 function Addon:OnInitialize()
 	self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
- 
+
 	self._tLoadingInfo = _tLoadingInfo
 
 	glog = Apollo.GetPackage("Gemini:Logging-1.2").tPackage:GetLogger({
@@ -103,7 +103,7 @@ function Addon:OnInitialize()
 		pattern = "%d [%c:%n] %l - %m",
 		appender = "print"
 	})
-	
+
 	Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
 	Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
 	Apollo.RegisterEventHandler("WindowManagementAdd", "OnAddonFullyLoaded", self) --rover
@@ -121,7 +121,7 @@ function Addon:OnEnable()
 	self:RawHook(Apollo.GetAddon("Inventory"),"OnGenerateTooltip")
 
 	for i = 1, #currencies do
-    	if currencies[i].account then 
+    	if currencies[i].account then
     		currencies[i].currencyObject = AccountItemLib.GetAccountCurrency(currencies[i].eType)
     	else
     		currencies[i].currencyObject = GameLib.GetPlayerCurrency(currencies[i].eType)
@@ -260,13 +260,13 @@ function Addon:OnDocumentReady()
 	Apollo.RegisterEventHandler("ToggleInventory", "OnVisibilityToggle", self)
 	Apollo.RegisterEventHandler("ShowInventory", "OnVisibilityToggle", self)
 
-	
+
 	Apollo.RegisterEventHandler("PlayerCurrencyChanged", "OnPlayerCurrencyChanged", self)
 	Apollo.RegisterEventHandler("AccountCurrencyChanged", "OnPlayerCurrencyChanged", self)
 	Apollo.RegisterEventHandler("PlayerEquippedItemChanged", "Redraw", self)
 
 	Apollo.RegisterEventHandler("GuildBank_ShowPersonalInventory", "OnVisibilityToggle", self)
-	
+
 	Apollo.RegisterEventHandler("LootedItem","OnItemLoot", self)
 	Apollo.RegisterEventHandler("ItemAdded","OnItemLoot", self)
 	Apollo.RegisterEventHandler("CombatLogLoot","OnItemLoot", self)
@@ -305,15 +305,15 @@ function Addon:FinalizeLoading()
 		Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = MAJOR, nSaveVersion=MINOR})
 		self._tLoadingInfo.WindowManagement.isInit = true
 	end
- 
-	if self._tLoadingInfo.SpaceStashCore.isReady and not self._tLoadingInfo.SpaceStashCore.isInit then 
+
+	if self._tLoadingInfo.SpaceStashCore.isReady and not self._tLoadingInfo.SpaceStashCore.isInit then
 		self:InitSpaceStashCore()
 	end
-	
+
 	self._tLoadingInfo.GUI.isInit = true
 	Event_FireGenericEvent("AddonFullyLoaded", {addon = self, strName = MAJOR})
 end
- 
+
 function Addon:OnWindowManagementReady()
 	self._tLoadingInfo.WindowManagement.isReady = true
 	if self._tLoadingInfo.GUI.isReady then
@@ -322,7 +322,7 @@ function Addon:OnWindowManagementReady()
 
 		self._tLoadingInfo.WindowManagement.isInit = true
 	end
- 
+
 end
 
 function Addon:OnInterfaceMenuListHasLoaded()
@@ -339,11 +339,10 @@ end
 function Addon:InitSpaceStashCore()
 	if not self._tLoadingInfo.GUI.isReady then return end
 	-- TODO: a way to defer SSI fully loaded to SSC (for senor plow modification).
- 
+
 	self._tLoadingInfo.SpaceStashCore.isInit = true
 	Event_FireGenericEvent("SendVarToRover", MAJOR, self)
 end
-
 ---------------------------------------------------------------------------------------------------
 -- SSI Commands
 ---------------------------------------------------------------------------------------------------
@@ -364,29 +363,32 @@ end
 ---------------------------------------------------------------------------------------------------
 -- SSI Visibility and positionning
 ---------------------------------------------------------------------------------------------------
+--BUG: when the close button is used, this method is called twice. Once of the button, and another one for the OnClose of the wndMain event.
 function Addon:CloseInventory()
 	if not self._tLoadingInfo.GUI.isReady then return end
 
-	--TODO: implement 'standby mode' to use less perf.
-	self.wndMain:Show(false,true)
-	self.wndBagWindow:MarkAllItemsAsSeen()
+
+    self.wndMain:Close()
+    self.wndMain:Show(false,true)
+    self.wndBagWindow:MarkAllItemsAsSeen()
 
 	Sound.Play(Sound.PlayUIBagClose) --CUSTOM: chosable sound
 end
 
 ---
---- This function show the inventory and update relevant 
+--- This function show the inventory and update relevant
 ---
 function Addon:OpenInventory()
 	if not self._tLoadingInfo.GUI.isReady then return end
-	
+
 	--TODO: implement 'standby mode' to use less perf. see @CloseInventory()
 
 	--TODO: Verify that currency things here are useful.
 	self:OnInventoryDisplayChange()
 	self:UpdateCashAmount()
-	self.wndMain:Show(true,true)
-	self.wndMain:ToFront()
+    self.wndMain:Show(true,true)
+	self.wndMain:Invoke()
+
 	Sound.Play(Sound.PlayUIBagOpen) --CUSTOM: chosable sound
 end
 
@@ -399,7 +401,6 @@ function Addon:OnVisibilityToggle() --TODO: Check if isReady is enought or if is
 		self:OpenInventory()
 	end
 end
-
 ---------------------------------------------------------------------------------------------------
 -- TODO: SSI quest inventory tab
 ---------------------------------------------------------------------------------------------------
@@ -593,7 +594,7 @@ function Addon:UpdateVirtualItemInventory()
 		wndCurr:FindChild("_Item"):SetSprite(tCurrItem.strIcon)
 		wndCurr:SetTooltip(string.format("<P Font=\"CRB_InterfaceSmall\">%s</P><P Font=\"CRB_InterfaceSmall\" TextColor=\"aaaaaaaa\">%s</P>", tCurrItem.strName, tCurrItem.strFlavor))
 	end
-	
+
 	-- Adjust heights
 	if not self.nQuestItemContainerHeight then
 		local nLeft, nTop, nRight, nBottom = wndVirtalItemsFrame:GetAnchorOffsets()
@@ -697,19 +698,19 @@ end
 --- This function update the checked / unchecked state of the right clic menu
 function Addon:UpdateCurrenciesMicroMenu()
 	self.SSICashButton:SetCheck(self.db.profile.config.currencies[1])
-	self.SSIRenownButton:SetCheck(self.db.profile.config.currencies[2]) 
-	self.SSIElderGemsButton:SetCheck(self.db.profile.config.currencies[3]) 
-	self.SSIGloryButton:SetCheck(self.db.profile.config.currencies[4]) 
-	self.SSIPrestigeButton:SetCheck(self.db.profile.config.currencies[5]) 
+	self.SSIRenownButton:SetCheck(self.db.profile.config.currencies[2])
+	self.SSIElderGemsButton:SetCheck(self.db.profile.config.currencies[3])
+	self.SSIGloryButton:SetCheck(self.db.profile.config.currencies[4])
+	self.SSIPrestigeButton:SetCheck(self.db.profile.config.currencies[5])
 	self.SSICraftingVouchersButton:SetCheck(self.db.profile.config.currencies[6])
 	self.SSIOmnibitsButton:SetCheck(self.db.profile.config.currencies[7])
 	self.SSIServicetokenButton:SetCheck(self.db.profile.config.currencies[8])
 	self.SSIFortunecoinButton:SetCheck(self.db.profile.config.currencies[9])
 
-	if self._tLoadingInfo.SpaceStashCore.isInit then 
+	if self._tLoadingInfo.SpaceStashCore.isInit then
 		self._tLoadingInfo.SpaceStashCore.instance:UpdateTrackedCurrency();
 	end
-	
+
 end
 
 
@@ -800,7 +801,7 @@ function Addon:UpdateTrackedCurrencies()
 	            tCurrenciesWindows[k] = Apollo.LoadForm(self.xmlDoc, "_CurrencyWindow", targetColumn, self)
 	            if targetColumn == rightColumn then targetColumn = leftColumn else targetColumn = rightColumn end
 	            tCurrenciesWindows[k]:SetName("CurrencyWindow_" .. k)
-	            if currencies[k].account then 
+	            if currencies[k].account then
 	            	tCurrenciesWindows[k]:SetMoneySystem(Money.CodeEnumCurrencyType.GroupCurrency, 0, 0, currencies[k].eType)
 	            	tCurrenciesWindows[k]:SetAmount(currencies[k].currencyObject:GetAmount(), true)
 	            else
@@ -830,7 +831,7 @@ function Addon:UpdateTrackedCurrencies()
 
     self:UpdateBottomFrameSize()
 
-    if self._tLoadingInfo.SpaceStashCore.isInit then 
+    if self._tLoadingInfo.SpaceStashCore.isInit then
 		self._tLoadingInfo.SpaceStashCore.instance:UpdateTrackedCurrency();
 	end
 end
@@ -842,7 +843,7 @@ end
 
 function Addon:OnPlayerCurrencyChanged()
 	for i = 1, #currencies do
-    	if currencies[i].account then 
+    	if currencies[i].account then
     		currencies[i].currencyObject = AccountItemLib.GetAccountCurrency(currencies[i].eType)
     	else
     		currencies[i].currencyObject = GameLib.GetPlayerCurrency(currencies[i].eType)
